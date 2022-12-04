@@ -7,23 +7,22 @@ pub struct Identity<'a>
     id:u64
 }
 
-pub trait COMPU_METHOD {
-    fn get_physical_value(rawvalue:&[u8])->f64;
-}
-
-pub struct ScaleLinear
-{
-    scale_coefficient_arr:[u32;4]
-}
-
-
-impl COMPU_METHOD for ScaleLinear
-{
+pub trait ComputeMethod {
     fn get_physical_value(rawvalue:&[u8])->f64
     {
         return 0.0;
     }
 }
+
+pub struct ScaleLinear;
+pub struct Identical;
+pub struct Textable;
+pub struct Linear;
+
+impl ComputeMethod for ScaleLinear{}
+impl ComputeMethod for Identical{}
+impl ComputeMethod for Textable{}
+impl ComputeMethod for Linear{}
 
 pub struct FunctionClass<'a>
 {

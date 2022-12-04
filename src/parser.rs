@@ -36,11 +36,29 @@ pub struct DTC <'a>
     trouble_code:u64,
     display_trouble_code:&'a str,
     text:&'a str,
-    ref_id:Option<u64>
+    ref_id:Option<u32>
 }
 
+pub struct DiagCodedType<'a>
+{
+    pub aaType:&'a str,
+    pub baseType:&'a str,
+    pub bitLength:u32,
+    pub ishighbyteorder:bool
+}
+pub struct ComParam<'a>
+{
+    pub ref_id:Option<u32>,
+    pub docType:&'a str,
+    pub value:u32,
+}
 
-pub struct DTCDOP <'a,T:COMPU_METHOD>
+pub trait  DataType {
+    fn createDataInstance(&self,name:&str,bytePostion:u32,bitPosition:u32);
+
+}
+
+pub struct DTCDOP <'a,T:ComputeMethod>
 {
     ident:Identity<'a>,
     diag_coded_type:&'a str,

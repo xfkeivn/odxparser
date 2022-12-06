@@ -1,67 +1,87 @@
+use std::collections::HashMap;
+use roxmltree::Document;
 
-#[derive(Debug,Clone, Copy,PartialEq)]
-pub struct Identity<'a>
+use crate::data_instance;
+use crate::data_type::*;
+use std::fs;
+use std::fs::{File, OpenOptions};
+use std::io;
+use std::io::prelude::*;
+use std::path::Path;
+
+pub struct DiagService<'a>
 {
-    short_name:&'a str,
-    long_name:&'a str,
-    id:u64
+    id:Identity<'a>,
+    semantic:&'a str,
+    request_ref:Option<u32>,
+    positive_response_ref:Option<u32>,
+    negative_response_ref:Option<u32>,
+    func_class_ref:Option<u32>,
+    parserContext:&'a ODXParser<'a>
 }
 
-pub trait ComputeMethod {
-    fn get_physical_value(rawvalue:&[u8])->f64
+pub struct ODXParser<'a>
+{
+    variants:HashMap<&'a str, &'a Variant<'a>>,
+    odxfile:String,
+
+}
+impl<'a> ODXParser<'a>
+{
+    pub fn new()->ODXParser<'a>
     {
-        return 0.0;
+        return ODXParser{variants:HashMap::new(),odxfile:String::new()}
+    }
+    pub fn parse(&mut self,odxfile:&'a str)->bool
+    {
+        self.variants.clear();
+        self.odxfile = odxfile.to_string();
+        let mut f = File::open(&self.odxfile).unwrap();
+        let mut s = String::new();
+        match f.read_to_string(&mut s) {
+        Ok(_) => {
+            let doc = roxmltree::Document::parse(&s).unwrap();
+            self.__parseDocument(&doc);
+            
+            return true;
+        },
+        Err(e) =>false
+         }
+    }
+    pub fn __parseDocument(&mut self,doc:&Document)
+    {
+        let rootElem = doc.descendants().find(|n| n.tag_name().name() == "ODX").unwrap();
+        for ele in rootElem.descendants()
+        {
+            if ele.tag_name().name() == "BASE-VARIANT"
+            {
+                
+            }
+        }
+
     }
 }
-
-pub struct ScaleLinear;
-pub struct Identical;
-pub struct Textable;
-pub struct Linear;
-
-impl ComputeMethod for ScaleLinear{}
-impl ComputeMethod for Identical{}
-impl ComputeMethod for Textable{}
-impl ComputeMethod for Linear{}
-
-pub struct FunctionClass<'a>
+pub struct ServiceMsg<'a>
 {
-    ident:Identity<'a>,
-    description:&'a str
+    id:Identity<'a>,
+    params:Vec<Box<Param>>
 }
 
-pub struct DTC <'a>
+pub struct PosResponse<'a>
 {
-    ident:Identity<'a>,
-    trouble_code:u64,
-    display_trouble_code:&'a str,
-    text:&'a str,
-    ref_id:Option<u32>
+    msg:ServiceMsg<'a>,
+}
+pub struct NegResponse<'a>
+{
+    msg:ServiceMsg<'a>,
+}
+pub struct Request<'a>
+{
+    msg:ServiceMsg<'a>,
 }
 
-pub struct DiagCodedType<'a>
+pub struct DiagSerivce<'a>
 {
-    pub aaType:&'a str,
-    pub baseType:&'a str,
-    pub bitLength:u32,
-    pub ishighbyteorder:bool
-}
-pub struct ComParam<'a>
-{
-    pub ref_id:Option<u32>,
-    pub docType:&'a str,
-    pub value:u32,
-}
-
-pub trait  DataType {
-    fn createDataInstance(&self,name:&str,bytePostion:u32,bitPosition:u32);
-
-}
-
-pub struct DTCDOP <'a,T:ComputeMethod>
-{
-    ident:Identity<'a>,
-    diag_coded_type:&'a str,
-    physical_type:&'a str,
-    compute_method:Option<T>
+    id:Identity<'a>,
+    
 }

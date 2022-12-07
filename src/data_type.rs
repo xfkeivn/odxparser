@@ -3,9 +3,9 @@ use std::collections::HashMap;
 #[derive(Debug,Clone, Copy,PartialEq)]
 pub struct Identity<'a>
 {
-    short_name:&'a str,
-    long_name:&'a str,
-    id:u64
+    pub short_name:&'a str,
+    pub long_name:&'a str,
+    pub id:&'a str
 }
 
 pub trait ComputeMethod {
@@ -18,7 +18,8 @@ pub trait ComputeMethod {
 
 pub struct  Variant<'a>
 {
-    id:Identity<'a>,
+    pub id:Identity<'a>,
+    /*
     dtc_object_props:HashMap<&'a str,DTCDOP<'a>>,
     data_object_props:HashMap<&'a str,DTCDOP<'a>>,
     env_data_descs:HashMap<&'a str,DTCDOP<'a>>,
@@ -31,7 +32,7 @@ pub struct  Variant<'a>
     neg_responses:HashMap<&'a str,DTCDOP<'a>>,
     comparam_refs:HashMap<&'a str,DTCDOP<'a>>,
     func_classes:HashMap<&'a str,DTCDOP<'a>>,
-    
+     */
 }
 
 pub struct ScaleLinear;

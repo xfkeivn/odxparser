@@ -53,9 +53,12 @@ impl<'a> ODXParser<'a>
         let rootElem = doc.descendants().find(|n| n.tag_name().name() == "ODX").unwrap();
         for ele in rootElem.descendants()
         {
-            if ele.tag_name().name() == "BASE-VARIANT"
+            let name = ele.tag_name().name();
+            if name == "BASE-VARIANT"
             {
-                
+                let shortname = ele.children().find(|n|n.tag_name().name() == "SHORT-NAME").unwrap_or_else(f);
+                let ident = Identity{};
+                let variant = Variant{};
             }
         }
 

@@ -1,0 +1,10 @@
+// RUST 如何处理没有实现copy的结构体的值返回
+1. 编程者角度，move，not copy， 所有权转移
+2. rust实现细节，调用者创建stack空间，传递指针给别调用函数，被调用函数将使用此指针空间进行返回值的放置，这属于实现细节。
+If your question is about what happens with the value you created from the point of view of you as a programmer, 
+then the answer is it is moved (unless it implements Copy). 
+You might want to go through some basic rust tutorials to grasp this concept.
+If you are asking about what happens under the hood, then I’m afraid there might be no single answer. 
+I believe, conceptually, the value is being copied using something like memcpy, but then the optimizer might kick in and eliminate this. 
+I don’t think there is something like a specification regarding this, and it might be better to consider this an implementation detail.
+There's also return value optimization, where the calling function allocates space and the pointer is passed to the caller which can fill out the return value there directly. This is the sort of thing a C programmer would be used to handling manually.

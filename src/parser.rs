@@ -201,13 +201,16 @@ impl<'b> ODXParser
         let computemethod:Option<Box<dyn ComputeMethod>> = self.__get_compute_method(datapropnode);
 
         let unit_ref = self.__get_unit_ref(datapropnode);
-        DataObjectProp{
+        let dop = DataObjectProp{
             ident :identitity,
             physical_type:physicaltype,
             diag_coded_type:diagcodetype,
             compute_method:computemethod,
             unit_ref:unit_ref
-        }
+        };
+        
+        println!("{:p}",&dop);
+        return dop
     }
 
     pub fn __get_dtc(&mut self,dtcnode:&Node)->DTC
@@ -245,6 +248,58 @@ impl<'b> ODXParser
 
     }
 
+    pub fn __get_env_data_desc(& mut self,node:&Node)->EnvDataDesc
+    {
+        let identitity = self.__get_ident(node);
+        let b=  EnvDataDesc{ident:identitity};
+        return b
+    }
+
+    pub fn __get_param(& mut self,node:&Node)->Param
+    {
+        let shortname = match node.children().find(|n|n.tag_name().name() == "SHORT-NAME")
+        {
+            Some(node)=>node.text().unwrap(),
+            _=>""
+            
+        };
+        let longname = node.children().find(|n|n.tag_name().name() == "LONG-NAME").map(|n|n.text()).unwrap();
+
+        let bytepos = self.__get_descendantText(node, "BYTE-POSITION");
+        let bitpos = self.__get_descendantText(node, "BIT-LENGTH");
+        let dop_ref = node.children().find(|n|n.tag_name().name() == "DOP-REF").map(|node|node.attribute("ID-REF").unwrap());
+        let phys_constant_value = self.__get_descendantText(node, "PHYS-CONSTANT-VALUE");
+        let codevalues = Vec::<u32>::new();
+        for n in  node.descendants()
+        {
+           if n.tag_name().name() == "CODED-VALUE"
+           {
+            let codevalue = n.text().unwrap().parse::<u32>().unwrap();
+            codevalues.push(codevalue)
+           }
+
+        }
+        ;
+        return Param { shortname: String::from(shortname), 
+                    longname: longname.map(|n|String::from(n)),
+                    codedvalues:codevalues,
+                    physical_constant_value:phys_constant_value.map(|s|s.parse::<u32>().unwrap())}
+       
+    }
+
+    pub fn __get_struct (& mut self,node:&Node)->Structure
+    {
+        let identitity = self.__get_ident(node);
+        let bytesize = self.__get_descendantText(node, "BYTE-SIZE");
+        let b =  Structure{
+            ident:identitity,
+            bytesize:bytesize.map(|s|s.parse::<u32>().unwrap()),
+
+        };
+
+        return b
+    }
+
     pub fn __parseDocument<'c>(&mut self,doc:&'c Document)->()
     {
         let rootElem = doc.descendants().find(|n| n.tag_name().name() == "ODX").unwrap();
@@ -258,7 +313,8 @@ impl<'b> ODXParser
                     id:ident,
                     func_classes:HashMap::new(),
                     dtc_object_props:HashMap::new(),
-                    data_object_props:HashMap::new()
+                    data_object_props:HashMap::new(),
+                    env_data_descs:HashMap::new(),
                 });
                 for desdentnode in ele.descendants()
                 {
@@ -277,7 +333,14 @@ impl<'b> ODXParser
                     else if  desdentnode.tag_name().name() == "DATA-OBJECT-PROP"
                     {
                         let dataprop = self.__get_data_prop(&desdentnode);
+                        println!("{:p}",&dataprop);
+                       
                         variant.data_object_props.insert(dataprop.ident.id.clone(), Box::new(dataprop));
+                    }
+                    else if  desdentnode.tag_name().name() == "ENV-DATA-DESC"
+                    {
+                        let dataprop = self.__get_env_data_desc(&desdentnode);
+                        variant.env_data_descs.insert(dataprop.ident.id.clone(), Box::new(dataprop));
                     }
 
                 }

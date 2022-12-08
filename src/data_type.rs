@@ -1,5 +1,6 @@
 use std::collections::HashMap;
-
+use std::rc::{Rc, Weak};
+use std::vec;
 #[derive(Debug,PartialEq)]
 pub struct Identity
 {
@@ -23,8 +24,9 @@ pub struct  Variant
     pub dtc_object_props:HashMap<String,Box<DTCDOP>>,
     
     pub data_object_props:HashMap<String,Box<DataObjectProp>>,
+    
+    pub env_data_descs:HashMap<String,Box<EnvDataDesc>>,
     /*
-    pub env_data_descs:HashMap<String,DataObjectProp>,
     pub units:HashMap<String,DataObjectProp>,
     pub structures:HashMap<String,DataObjectProp>,
     pub diag_comms:HashMap<String,DataObjectProp>,
@@ -51,11 +53,18 @@ pub struct InternalConstrainScale;
 #[derive(Debug)]
 pub struct Unit
 {
-
+    pub ident:Identity
 }
 #[derive(Debug)]
 
-pub struct Param;
+pub struct Param
+{
+    pub shortname:String,
+    pub longname:Option<String>,
+    pub codedvalues:Vec<u32>,
+    pub physical_constant_value:Option<u32>,
+    pub diag_coded_type:
+}
 
 
 
@@ -115,11 +124,30 @@ pub struct DataObjectProp
 
 pub struct Structure
 {
-    params:Vec<Box<Param>>,
-    id:Identity,
-    bytesize:u32,
-    variant:Variant,
+    pub params:Vec<Box<Param>>,
+    pub ident:Identity,
+    pub bytesize:Option<u32>,
+    ///Weak 可以用来解决循环引用赵成的内存如法释放，Variant拥有struct，struct又有variant，可能会照成循环引用
+    pub variant:Weak<Variant>,
     dataObjectProp:DataObjectProp,
+}
+
+
+pub struct EnvDataDesc{
+    pub ident:Identity
+}
+
+pub struct EnvData
+{
+
+}
+pub struct MuxCase
+{
+
+}
+pub struct MuxSwitch
+{
+
 }
 
 pub struct EndOfPDUField
@@ -127,7 +155,7 @@ pub struct EndOfPDUField
     dataObjectProp:DataObjectProp,
 }
 
-pub struct MUX
+pub struct Mux
 {
     dataObjectProp:DataObjectProp,
 }

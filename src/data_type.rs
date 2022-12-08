@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
-#[derive(Debug,Clone, Copy,PartialEq)]
-pub struct Identity<'a>
+#[derive(Debug,PartialEq)]
+pub struct Identity
 {
-    pub short_name:&'a str,
-    pub long_name:&'a str,
-    pub id:&'a str
+    pub short_name:String,
+    pub long_name:Option<String>,
+    pub id:String
 }
 
 pub trait ComputeMethod {
@@ -16,72 +16,87 @@ pub trait ComputeMethod {
 }
 
 
-pub struct  Variant<'a>
+pub struct  Variant
 {
-    pub id:Identity<'a>,
+    pub id:Identity,
+    
+    pub dtc_object_props:HashMap<String,Box<DTCDOP>>,
+    
+    pub data_object_props:HashMap<String,Box<DataObjectProp>>,
     /*
-    dtc_object_props:HashMap<&'a str,DTCDOP<'a>>,
-    data_object_props:HashMap<&'a str,DTCDOP<'a>>,
-    env_data_descs:HashMap<&'a str,DTCDOP<'a>>,
-    units:HashMap<&'a str,DTCDOP<'a>>,
-    structures:HashMap<&'a str,DTCDOP<'a>>,
-    diag_comms:HashMap<&'a str,DTCDOP<'a>>,
-    diag_comms_name_map:HashMap<&'a str,DTCDOP<'a>>,
-    requests:HashMap<&'a str,DTCDOP<'a>>,
-    pos_responses:HashMap<&'a str,DTCDOP<'a>>,
-    neg_responses:HashMap<&'a str,DTCDOP<'a>>,
-    comparam_refs:HashMap<&'a str,DTCDOP<'a>>,
-    func_classes:HashMap<&'a str,DTCDOP<'a>>,
-     */
-}
+    pub env_data_descs:HashMap<String,DataObjectProp>,
+    pub units:HashMap<String,DataObjectProp>,
+    pub structures:HashMap<String,DataObjectProp>,
+    pub diag_comms:HashMap<String,DataObjectProp>,
+    pub diag_comms_name_map:HashMap<String,DataObjectProp>,
+    pub requests:HashMap<String,DataObjectProp>,
+    pub pos_responses:HashMap<String,DataObjectProp>,
+    pub neg_responses:HashMap<String,DataObjectProp>,
+    pub comparam_refs:HashMap<String,DataObjectProp>,     */
+    pub func_classes:HashMap<String,Box<FunctionClass>>,
 
+}
+#[derive(Debug)]
 pub struct ScaleLinear;
+#[derive(Debug)]
 pub struct Identical;
+#[derive(Debug)]
 pub struct Textable;
+#[derive(Debug)]
 pub struct Linear;
+#[derive(Debug)]
 pub struct InternalConstrain;
+#[derive(Debug)]
 pub struct InternalConstrainScale;
-pub struct Unit;
+#[derive(Debug)]
+pub struct Unit
+{
+
+}
+#[derive(Debug)]
 
 pub struct Param;
+
 
 
 impl ComputeMethod for ScaleLinear{}
 impl ComputeMethod for Identical{}
 impl ComputeMethod for Textable{}
 impl ComputeMethod for Linear{}
-
-pub struct FunctionClass<'a>
+#[derive(Debug)]
+pub struct FunctionClass
 {
-    ident:Identity<'a>,
-    description:&'a str
+    pub ident:Identity,
+    pub description:String,
 }
 
-
-pub struct DTC <'a>
+#[derive(Debug)]
+pub struct DTC 
 {
-    ident:Identity<'a>,
-    trouble_code:u64,
-    display_trouble_code:&'a str,
-    text:&'a str,
-    ref_id:Option<u32>
-}
+    pub ident:Identity,
+    pub trouble_code:u64,
+    pub display_trouble_code:String,
+    pub text:String,
 
-pub struct DiagCodedType<'a>
+}
+#[derive(Debug)]
+pub struct DiagCodedType
 {
-    pub aa_type:&'a str,
-    pub base_type:&'a str,
-    pub bit_length:u32,
-    pub ishighbyteorder:bool
+    pub aa_type:Option<String>,
+    pub base_type:Option<String>,
+    pub bit_length:Option<u32>,
+    pub ishighbyteorder:Option<bool>
 }
-
-pub struct PhysicalType<'a>{
-  base_data_type:&'a str
+#[derive(Debug)]
+pub struct PhysicalType{
+  pub base_data_type:Option<String>,
+  pub display_radix:Option<String>
 }
-pub struct ComParam<'a>
+#[derive(Debug)]
+pub struct ComParam
 {
     pub ref_id:Option<u32>,
-    pub doc_type:&'a str,
+    pub doc_type:String,
     pub value:u32,
 }
 
@@ -89,46 +104,48 @@ pub trait  DataType {
     fn create_data_instance(&self,name:&str,byte_postion:u32,bit_position:u32);
 }
 
-pub struct DataObjectProp<'a>
+pub struct DataObjectProp
 {
-    diagCodeType:Option<DiagCodedType<'a>>,
-    physical_type:&'a PhysicalType<'a>,
-    diag_coded_type:&'a DiagCodedType<'a>,
-    compute_method:&'a dyn ComputeMethod,
-    ident:Identity<'a>,
-    ref_id:Option<u32>,
+    pub physical_type:Option<PhysicalType>,
+    pub diag_coded_type:Option<DiagCodedType>,
+    pub ident:Identity,
+    pub compute_method:Option<Box<dyn ComputeMethod>>,
+    pub unit_ref:Option<String>
 }
 
-pub struct Structure<'a>
+pub struct Structure
 {
-    dataObjectProp:DataObjectProp<'a>,
     params:Vec<Box<Param>>,
-    id:Identity<'a>,
+    id:Identity,
     bytesize:u32,
-    variant:&'a Variant<'a>
+    variant:Variant,
+    dataObjectProp:DataObjectProp,
 }
 
 pub struct EndOfPDUField
 {
-
+    dataObjectProp:DataObjectProp,
 }
+
 pub struct MUX
 {
-
+    dataObjectProp:DataObjectProp,
 }
 
 pub struct StaticField
 {
-
+    dataObjectProp:DataObjectProp,
 }
 
 pub struct DynamicLengthField
 {
-
+    dataObjectProp:DataObjectProp,
 }
 
-pub struct DTCDOP <'a>
+
+pub struct DTCDOP
 {
-    ident:Identity<'a>,
-    dataObjectProp:DataObjectProp<'a>,
+    pub ident:Identity,
+    pub dataObjectProp:DataObjectProp,
+    pub dtcs:Vec<Box<DTC>>
 }

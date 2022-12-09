@@ -26,9 +26,16 @@ pub struct  Variant
     pub data_object_props:HashMap<String,Box<DataObjectProp>>,
     
     pub env_data_descs:HashMap<String,Box<EnvDataDesc>>,
+
+    pub structures:HashMap<String,Box<Structure>>,
+
+    pub static_fileds:HashMap<String,Box<StaticField>>,
+
+    pub dynamic_fileds:HashMap<String,Box<DynamicLengthField>>,
+    pub endofpdu_fileds:HashMap<String,Box<EndOfPDUField>>,
     /*
     pub units:HashMap<String,DataObjectProp>,
-    pub structures:HashMap<String,DataObjectProp>,
+    
     pub diag_comms:HashMap<String,DataObjectProp>,
     pub diag_comms_name_map:HashMap<String,DataObjectProp>,
     pub requests:HashMap<String,DataObjectProp>,
@@ -62,8 +69,15 @@ pub struct Param
     pub shortname:String,
     pub longname:Option<String>,
     pub codedvalues:Vec<u32>,
+    pub dop_ref:Option<String>,
+    pub byte_position:Option<u32>,
+    pub bit_position:Option<u32>,
+    pub bit_length:Option<u32>,
+    pub sematic:Option<String>,
+    pub aa_type:Option<String>,
+    pub variant_id:String,
     pub physical_constant_value:Option<u32>,
-    pub diag_coded_type:
+    pub diag_coded_type:Option<DiagCodedType>
 }
 
 
@@ -128,46 +142,77 @@ pub struct Structure
     pub ident:Identity,
     pub bytesize:Option<u32>,
     ///Weak 可以用来解决循环引用赵成的内存如法释放，Variant拥有struct，struct又有variant，可能会照成循环引用
-    pub variant:Weak<Variant>,
-    dataObjectProp:DataObjectProp,
+    pub variantId:String
+   
 }
 
 
 pub struct EnvDataDesc{
-    pub ident:Identity
+    pub ident:Identity,
+    //pub param_snref:Option<String>,
+   // pub env_data_refs:Vec<String>,
+    //pub env_datas:Vec<EnvData>
 }
 
 pub struct EnvData
 {
+    pub structure:Structure,
+    pub dtc_values:Vec<u64>
 
 }
 pub struct MuxCase
 {
-
+    pub shortname:String,
+    pub ref_structure_id:Option<String>,
+    pub switch_lower_lim:Option<u32>,
+    pub switch_upper_lim:Option<u32>,
+    pub is_default:bool
 }
 pub struct MuxSwitch
 {
+    pub byte_position:Option<u32>,
+    pub ref_data_prop_id:Option<String>,
+    pub bit_position:Option<u32>
 
 }
 
 pub struct EndOfPDUField
 {
-    dataObjectProp:DataObjectProp,
+    pub ident:Identity,
+    pub max_item_number:Option<u32>,
+    pub min_item_number:Option<u32>,
+    pub basic_struct_ref:Option<String>,
+    pub variant_id:String,
 }
 
 pub struct Mux
 {
-    dataObjectProp:DataObjectProp,
+    pub ident:Identity,
+    pub variant_id:String,
+    pub cases:Vec<MuxCase>,
+    pub default_case:Option<MuxCase>,
+    pub switch_key:MuxSwitch,
+    pub case_start_byte_offset:Option<u32>
 }
 
 pub struct StaticField
 {
-    dataObjectProp:DataObjectProp,
+   pub   ident:Identity,
+   pub   ref_struct_id:Option<String>,
+   pub   size:Option<u32>,
+   pub   item_size:Option<u32>,
+   pub   variant_id:String
+
 }
 
 pub struct DynamicLengthField
 {
-    dataObjectProp:DataObjectProp,
+    pub ident:Identity,
+    pub ref_struct_id:Option<String>,
+    pub variant_id:String,
+    pub offset_of_first_basic_structure:Option<u32>,
+    //length_determind_dop_refid:Option<String>
+    pub byte_pos_length_determined_dop:Option<String>,
 }
 
 

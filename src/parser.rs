@@ -1,4 +1,7 @@
 use std::collections::HashMap;
+use std::process::id;
+use std::rc::Weak;
+use std::rc::Rc;
 use roxmltree::Document;
 use roxmltree::Node;
 use crate::data_instance;
@@ -22,8 +25,8 @@ pub struct DiagService
 
 pub struct ODXParser
 {
-    pub variants:HashMap<String, Box<Variant>>,
-    odxfile:String,
+    pub variants:HashMap<String, Rc<Variant>>,
+    odxfile:String
 
 }
 impl<'b> ODXParser
@@ -71,7 +74,7 @@ impl<'b> ODXParser
             _=>""
             
         };
-        let longname = ele.children().find(|n|n.tag_name().name() == "LONG-NAME").map(|n|n.text()).unwrap();
+        let longname = ele.children().find(|n|n.tag_name().name() == "LONG-NAME").map(|n|n.text().unwrap());
         
         let ident = Identity
         {
@@ -251,39 +254,56 @@ impl<'b> ODXParser
     pub fn __get_env_data_desc(& mut self,node:&Node)->EnvDataDesc
     {
         let identitity = self.__get_ident(node);
-        let b=  EnvDataDesc{ident:identitity};
-        return b
+        
+        EnvDataDesc{ident:identitity}
+
     }
 
     pub fn __get_param(& mut self,node:&Node)->Param
     {
+        let longname = match node.children().find(|n|n.tag_name().name() == "LONG-NAME")
+        {
+            Some(node)=>Some(node.text().unwrap()),
+            _=>None
+            
+        };
         let shortname = match node.children().find(|n|n.tag_name().name() == "SHORT-NAME")
         {
             Some(node)=>node.text().unwrap(),
             _=>""
-            
         };
-        let longname = node.children().find(|n|n.tag_name().name() == "LONG-NAME").map(|n|n.text()).unwrap();
 
-        let bytepos = self.__get_descendantText(node, "BYTE-POSITION");
-        let bitpos = self.__get_descendantText(node, "BIT-LENGTH");
+        let bytepos = self.__get_descendantText(node, "BYTE-POSITION").map(|s|s.parse::<u32>().unwrap());
+        let bitpos = self.__get_descendantText(node, "BIT-POSITION").map(|s|s.parse::<u32>().unwrap());
+        let bitlen = self.__get_descendantText(node, "BIT-LENGTH").map(|s|s.parse::<u32>().unwrap());
         let dop_ref = node.children().find(|n|n.tag_name().name() == "DOP-REF").map(|node|node.attribute("ID-REF").unwrap());
         let phys_constant_value = self.__get_descendantText(node, "PHYS-CONSTANT-VALUE");
-        let codevalues = Vec::<u32>::new();
+        let aatype = node.attribute("AA:type").map(|s|String::from(s));
+        let sematic = node.attribute("SEMANTIC").map(|s|String::from(s));
+        let mut codevalues = Vec::<u32>::new();
         for n in  node.descendants()
         {
            if n.tag_name().name() == "CODED-VALUE"
            {
             let codevalue = n.text().unwrap().parse::<u32>().unwrap();
-            codevalues.push(codevalue)
+            codevalues.push(codevalue);
            }
 
-        }
-        ;
-        return Param { shortname: String::from(shortname), 
-                    longname: longname.map(|n|String::from(n)),
-                    codedvalues:codevalues,
-                    physical_constant_value:phys_constant_value.map(|s|s.parse::<u32>().unwrap())}
+        };
+    
+        return Param { 
+                        aa_type:aatype,
+                        sematic:sematic,
+                        variant_id:String::new(),
+                        shortname: String::from(shortname), 
+                        longname:  longname.map(|s|String::from(s)), 
+                        byte_position:bytepos,
+                        bit_position:bitpos,
+                        bit_length:bitlen,
+                        codedvalues:codevalues,
+                        dop_ref:dop_ref.map(|n|String::from(n)),
+                        physical_constant_value:phys_constant_value.map(|s|s.parse::<u32>().unwrap()),
+                        diag_coded_type:self.__get_diag_coded_type(node)}
        
     }
 
@@ -291,17 +311,154 @@ impl<'b> ODXParser
     {
         let identitity = self.__get_ident(node);
         let bytesize = self.__get_descendantText(node, "BYTE-SIZE");
-        let b =  Structure{
+        let mut struct_obj =  Structure{
             ident:identitity,
             bytesize:bytesize.map(|s|s.parse::<u32>().unwrap()),
+            params:Vec::new(),
+            variantId:String::new()
 
         };
+        for ele in node.descendants()
+        {
+           if ele.tag_name().name() == "PARAM"
+           {
+            let param = self.__get_param(&ele);
+            struct_obj.params.push(Box::new(param));
 
-        return b
+           }
+        }
+
+        return struct_obj;
+    }
+
+    pub fn __get_static_field(&mut self,node:&Node)->StaticField
+    {
+
+        let identitity = self.__get_ident(node);
+        let numberofitem = self.__get_descendantText(node, "FIXED-NUMBER-OF-ITEMS").map(|s|s.parse::<u32>().unwrap());
+        let structref = node.children().find(|n|n.tag_name().name() == "BASIC-STRUCTURE-REF").map(|node|String::from(node.attribute("ID-REF").unwrap()));
+        let itemsize = self.__get_descendantText(node, "ITEM-BYTE-SIZE").map(|s|s.parse::<u32>().unwrap());
+
+        StaticField{
+            ident:identitity,
+            ref_struct_id:structref,
+            size:numberofitem,
+            item_size:itemsize,
+            variant_id:String::new()
+        }
+    }
+
+    pub fn __get_dynamic_field(&mut self,node:&Node)->DynamicLengthField
+    {
+
+        let identitity = self.__get_ident(node);
+        let numberofitem = self.__get_descendantText(node, "FIXED-NUMBER-OF-ITEMS").map(|s|s.parse::<u32>().unwrap());
+        let offset_of_first_basicstructure = self.__get_descendantText(node, "OFFSET").map(|s|s.parse::<u32>().unwrap());
+        let dopref = node.children().find(|n|n.tag_name().name() == "DATA-OBJECT-PROP-REF").map(|node|String::from(node.attribute("ID-REF").unwrap()));
+        let structref = node.children().find(|n|n.tag_name().name() == "BASIC-STRUCTURE-REF").map(|node|String::from(node.attribute("ID-REF").unwrap()));
+        let itemsize = self.__get_descendantText(node, "ITEM-BYTE-SIZE").map(|s|s.parse::<u32>().unwrap());
+
+        DynamicLengthField{
+            ident:identitity,
+            ref_struct_id:structref,
+            byte_pos_length_determined_dop:dopref,
+            offset_of_first_basic_structure:offset_of_first_basicstructure,
+            //length_determind_dop_refid:dopref,
+            variant_id:String::new()
+        }
+    }
+
+    pub fn __get_endofpdu_field(&mut self,node:&Node)->EndOfPDUField
+    {
+
+        let identitity = self.__get_ident(node);
+        let structref = node.children().find(|n|n.tag_name().name() == "BASIC-STRUCTURE-REF").map(|node|String::from(node.attribute("ID-REF").unwrap()));
+        let maxitem = self.__get_descendantText(node, "MAX_NUMBER_OF_ITEMS").map(|s|s.parse::<u32>().unwrap());
+        let minitem = self.__get_descendantText(node, "MIN_NUMBER_OF_ITEMS").map(|s|s.parse::<u32>().unwrap());
+
+        EndOfPDUField{
+            ident:identitity,
+            max_item_number:maxitem,
+            min_item_number:minitem,
+            basic_struct_ref:structref,
+            //length_determind_dop_refid:dopref,
+            variant_id:String::new()
+        }
+    }
+
+    pub fn __get_mux_case(&mut self,node:&Node)->MuxCase
+    {
+        let shortname = self.__get_descendantText(node, "SHORT-NAME").unwrap();
+        let lowlimit = self.__get_descendantText(node, "LOWER-LIMIT").map(|s|s.parse::<u32>().unwrap());
+        let hilimit = self.__get_descendantText(node, "UPPER-LIMIT").map(|s|s.parse::<u32>().unwrap());
+        let structref = node.children().find(|n|n.tag_name().name() == "STRUCTURE-REF").map(|node|String::from(node.attribute("ID-REF").unwrap()));
+        MuxCase { shortname: String::from(shortname), ref_structure_id:structref, switch_lower_lim: lowlimit, switch_upper_lim: hilimit, is_default: false }
+    }
+
+    pub fn __get_mux(&mut self,node:&Node)->Mux
+    {
+
+        let identitity = self.__get_ident(node);
+        let case_start_byte_offset = self.__get_descendantText(node, "BYTE-POSITION").map(|s|s.parse::<u32>().unwrap());
+        let switchKeyNode = node.children().find(|n|n.tag_name().name() == "SWITCH-KEY").unwrap();
+
+        let  ms = self.__get_mux_key(&switchKeyNode);
+        let default_casenode = node.descendants().find(|n| n.tag_name().name() == "DEFAULT-CASE");
+        let mut cases = Vec::<MuxCase>::new();
+        let default_case = match default_casenode
+        {
+            Some(node)=>{
+                
+                let mut case =   self.__get_mux_case(&node);
+                case.is_default = true;
+                Some(case)
+            },
+            _=>None
+        };
+        
+
+        for desdentnode in node.descendants()
+        {
+
+            if desdentnode.tag_name().name() == "CASE"
+            {
+                let case = self.__get_mux_case(&desdentnode);
+                cases.push(case);
+            
+                
+
+            }
+        }
+
+        Mux{
+            ident:identitity,
+            switch_key:ms,
+            cases:cases,
+            default_case:default_case,
+            case_start_byte_offset:case_start_byte_offset,
+            //length_determind_dop_refid:dopref,
+            variant_id:String::new()
+        }
+    }
+    pub fn __get_mux_key(&mut self,node:&Node)->MuxSwitch
+    {
+
+        let dopref = node.children().find(|n|n.tag_name().name() == "DATA-OBJECT-PROP-REF").map(|node|String::from(node.attribute("ID-REF").unwrap()));
+        let bytePos = self.__get_descendantText(node, "BYTE-POSITION").map(|s|s.parse::<u32>().unwrap());
+        let bitPos = self.__get_descendantText(node, "BIT-POSITION").map(|s|s.parse::<u32>().unwrap());
+
+
+        MuxSwitch{
+          
+            byte_position:bytePos,
+            bit_position:bitPos,
+            ref_data_prop_id:dopref
+        }
     }
 
     pub fn __parseDocument<'c>(&mut self,doc:&'c Document)->()
     {
+        
         let rootElem = doc.descendants().find(|n| n.tag_name().name() == "ODX").unwrap();
         for ele in rootElem.descendants()
         {
@@ -309,13 +466,20 @@ impl<'b> ODXParser
             if name == "BASE-VARIANT"
             {
                 let ident = self.__get_ident(&ele);
-                let mut variant = Box::new(Variant{
+                let mut variant = Variant{
                     id:ident,
                     func_classes:HashMap::new(),
                     dtc_object_props:HashMap::new(),
                     data_object_props:HashMap::new(),
                     env_data_descs:HashMap::new(),
-                });
+                    structures:HashMap::new(),
+                    static_fileds:HashMap::new(),
+                    dynamic_fileds:HashMap::new(),
+                    endofpdu_fileds:HashMap::new(),
+
+                };
+                
+                
                 for desdentnode in ele.descendants()
                 {
                     //println!("{}",desdentnode.tag_name().name());
@@ -342,11 +506,36 @@ impl<'b> ODXParser
                         let dataprop = self.__get_env_data_desc(&desdentnode);
                         variant.env_data_descs.insert(dataprop.ident.id.clone(), Box::new(dataprop));
                     }
+                    else if  desdentnode.tag_name().name() == "STRUCTURE"
+                    {
+                        let mut dataprop = self.__get_struct(&desdentnode);
+                        dataprop.variantId = variant.id.id.clone();
+                        variant.structures.insert(dataprop.ident.id.clone(), Box::new(dataprop));
+                    }
+                    else if  desdentnode.tag_name().name() == "STATIC-FIELD"
+                    {
+                        let mut dataprop = self.__get_static_field(&desdentnode);
+                        dataprop.variant_id = variant.id.id.clone();
+                        variant.static_fileds.insert(dataprop.ident.id.clone(), Box::new(dataprop));
+                    }
+                    else if  desdentnode.tag_name().name() == "DYNAMIC_LENGTH_FIELD"
+                    {
+                        let mut dataprop = self.__get_dynamic_field(&desdentnode);
+                        dataprop.variant_id = variant.id.id.clone();
+                        variant.dynamic_fileds.insert(dataprop.ident.id.clone(), Box::new(dataprop));
+                    }
+                    else if  desdentnode.tag_name().name() == "END-OF-PDU-FIELD"
+                    {
+                        let mut dataprop = self.__get_endofpdu_field(&desdentnode);
+                        dataprop.variant_id = variant.id.id.clone();
+                        variant.endofpdu_fileds.insert(dataprop.ident.id.clone(), Box::new(dataprop));
+                    }
+                    
 
                 }
-                
+                self.variants.insert(variant.id.id.clone(), Rc::new(variant));
         
-                self.variants.insert(variant.id.id.clone(), variant);
+                
             }
         }
 

@@ -1,13 +1,17 @@
 use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 use std::vec;
+use crate::data_instance::*;
 #[derive(Debug,PartialEq)]
+#[derive(Default)]
 pub struct Identity
 {
     pub short_name:String,
     pub long_name:Option<String>,
     pub id:String
 }
+
+
 
 pub trait ComputeMethod {
     fn get_physical_value(&self,rawvalue:&[u8])->f64
@@ -16,35 +20,31 @@ pub trait ComputeMethod {
     }
 }
 
-
+#[derive(Default)]
 pub struct  Variant
 {
     pub id:Identity,
-    
     pub dtc_object_props:HashMap<String,Box<DTCDOP>>,
-    
     pub data_object_props:HashMap<String,Box<DataObjectProp>>,
-    
     pub env_data_descs:HashMap<String,Box<EnvDataDesc>>,
-
     pub structures:HashMap<String,Box<Structure>>,
-
     pub static_fileds:HashMap<String,Box<StaticField>>,
-
     pub dynamic_fileds:HashMap<String,Box<DynamicLengthField>>,
     pub endofpdu_fileds:HashMap<String,Box<EndOfPDUField>>,
-    /*
-    pub units:HashMap<String,DataObjectProp>,
-    
-    pub diag_comms:HashMap<String,DataObjectProp>,
-    pub diag_comms_name_map:HashMap<String,DataObjectProp>,
-    pub requests:HashMap<String,DataObjectProp>,
-    pub pos_responses:HashMap<String,DataObjectProp>,
-    pub neg_responses:HashMap<String,DataObjectProp>,
-    pub comparam_refs:HashMap<String,DataObjectProp>,     */
+    pub units:HashMap<String,Box<Unit>>,
+    pub diag_comms:HashMap<String,Box<DiagSerivce>>,
+    pub requests:HashMap<String,Box<ServiceMsgType>>,
+    pub pos_responses:HashMap<String,Box<ServiceMsgType>>,
+    pub neg_responses:HashMap<String,Box<ServiceMsgType>>,
+    pub comparam_refs:HashMap<String,Box<ComParam>>,     
     pub func_classes:HashMap<String,Box<FunctionClass>>,
-
 }
+
+
+
+
+
+
 #[derive(Debug)]
 pub struct ScaleLinear;
 #[derive(Debug)]
@@ -60,7 +60,8 @@ pub struct InternalConstrainScale;
 #[derive(Debug)]
 pub struct Unit
 {
-    pub ident:Identity
+    pub ident:Identity,
+    pub display_name:String
 }
 #[derive(Debug)]
 
@@ -118,13 +119,21 @@ pub struct PhysicalType{
 #[derive(Debug)]
 pub struct ComParam
 {
-    pub ref_id:Option<u32>,
-    pub doc_type:String,
-    pub value:u32,
+    pub ref_id:String,
+    pub doc_type:Option<String>,
+    pub doc_ref:Option<String>,
+    pub value:Option<String>,
 }
 
 pub trait  DataType {
-    fn create_data_instance(&self,name:&str,byte_postion:u32,bit_position:u32);
+    fn create_data_instance(&self,name:&str,byte_postion:u32,bit_position:u32)->&TDataInstance
+    {
+
+    }
+    fn is_high_low_byte_order(&self)
+    {
+        return false;
+    }
 }
 
 pub struct DataObjectProp
@@ -146,18 +155,18 @@ pub struct Structure
    
 }
 
-
+#[derive(Default)]
 pub struct EnvDataDesc{
     pub ident:Identity,
-    //pub param_snref:Option<String>,
-   // pub env_data_refs:Vec<String>,
-    //pub env_datas:Vec<EnvData>
+    pub param_snref:Option<String>,
+    pub env_data_refs:Vec<String>,
+    pub env_datas:Vec<EnvData>
 }
 
 pub struct EnvData
 {
-    pub structure:Structure,
-    pub dtc_values:Vec<u64>
+    pub ident:Identity,
+    pub params:Vec<Param>
 
 }
 pub struct MuxCase
@@ -221,4 +230,27 @@ pub struct DTCDOP
     pub ident:Identity,
     pub dataObjectProp:DataObjectProp,
     pub dtcs:Vec<Box<DTC>>
+}
+
+pub struct SeviceMsgPayload
+{
+    pub ident:Identity,
+    pub params:Vec<Param>
+}
+
+pub enum ServiceMsgType {
+    Request(SeviceMsgPayload),
+    PositiveResponse(SeviceMsgPayload),
+    NegativeReponse(SeviceMsgPayload)
+}
+
+#[derive(Default)]
+pub struct DiagSerivce
+{
+    pub ident:Identity,
+    pub semantic:Option<String>,
+    pub request_ref:String,
+    pub pos_response_ref:Option<String>,
+    pub neg_response_ref:Option<String>,
+    pub func_class_ref:Option<String>    
 }

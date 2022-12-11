@@ -12,10 +12,10 @@ mod tests {
     use super::*;
 
 
-    async fn parsing()
+    fn parsing()
     {
         let odxpath = r"D:\Workspace\RustApp\odxparser\src\CN180S_V1.0.80.odx";
-        //let odxpath = r"E:\WORKSPACE\RustApps\odx_parser\src\CN180S_V1.0.80.odx";
+        let odxpath = r"E:\WORKSPACE\RustApps\odx_parser\src\CN180S_V1.0.80.odx";
         let mut parser = parser::ODXParser::new();
         parser.parse(odxpath);
         for (key,value) in parser.variants.iter()
@@ -57,7 +57,7 @@ mod tests {
 
     #[test]
     fn test() {
-        parsing().await;
+        parsing();
       
 
     }

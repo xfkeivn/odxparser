@@ -110,8 +110,17 @@ impl<'b> ODXParser
         };
         return result;
 
+
+        
     }
     
+    pub fn __get_unit(&mut self,parentunit:&Node)->Unit
+    {
+      let ident = self.__get_ident(parentunit);
+      let displayname = self.__get_descendantText(parentunit, "DISPLAY-NAME").unwrap_or("");
+      Unit { ident: ident,display_name:String::from(displayname) }
+
+    }
 
     /// get diag coded type from the parent node, return the option 
     pub fn __get_diag_coded_type(&mut self,diagcodetypeParent:&Node)->Option<DiagCodedType>
@@ -158,26 +167,49 @@ impl<'b> ODXParser
         
     }
 
+
+    pub fn __get_linear(&mut self,linearnode:&Node)->Linear
+    {
+        let scalnode = linearnode.descendants().find(|n|n.tag_name().name() == "COMPU-SCALE").unwrap();
+        let lowlimit = linearnode.descendants().find(|n|n.tag_name().name() == "LOWER-LIMIT");
+        let hightlimit = linearnode.descendants().find(|n|n.tag_name().name() == "UPPER-LIMIT");
+
+        Linear{}
+
+    }
+    pub fn __get_scale_linear(&mut self,computeMethodParent:&Node)->ScaleLinear
+    {
+
+        ScaleLinear{}
+    }
+    pub fn __get_textable(&mut self,computeMethodParent:&Node)->Textable
+    {
+        Textable{}
+
+
+    }
+
     pub fn __get_compute_method(&mut self,computeMethodParent:&Node)->Option<Box<dyn ComputeMethod>>
     {
         let result = match computeMethodParent.descendants().find(|n|n.tag_name().name() == "COMPU-METHOD")
         {
-            Some(physicaltypenode)=>{
-                let category = self.__get_descendantText(&physicaltypenode, "CATEGORY").unwrap();
+            Some(computenode)=>{
+                let category = self.__get_descendantText(&computenode, "CATEGORY").unwrap();
                 let cm:Box<dyn ComputeMethod>;
                 if (category == "LINEAR")
                 {
-                    cm = Box::new(Linear{});
+                    cm = Box::new(self.__get_linear(&computenode));
 
                 }
                 else if (category == "SCALE-LINEAR")
                 {
-                    cm = Box::new(ScaleLinear{});
+
+                    cm = Box::new(self.__get_scale_linear(&computenode));
                     
                 }
                 else if (category == "TEXTTABLE")
                 {
-                    cm = Box::new(Textable{});
+                    cm = Box::new(self.__get_textable(&computenode));
                     
                 }
                 else {
@@ -254,10 +286,49 @@ impl<'b> ODXParser
     pub fn __get_env_data_desc(& mut self,node:&Node)->EnvDataDesc
     {
         let identitity = self.__get_ident(node);
-        
-        EnvDataDesc{ident:identitity}
+        let mut id_refs = Vec::<String>::new();
+        let mut envdatas = Vec::<EnvData>::new();
+        for n in  node.descendants()
+        {
+           if n.tag_name().name() == "ENV-DATA-REF"
+           {
+                let id_ref = n.attribute("ID-REF").map(|s|String::from(s)).unwrap();
+                id_refs.push(id_ref);
+           }
+           if n.tag_name().name() == "ENV-DATA"
+           {
+            let envdata = self.__get_env_data(&n);
+            envdatas.push(envdata);
+           }
+          
+        }
+
+        EnvDataDesc{ident:identitity,env_data_refs:id_refs,env_datas:envdatas,..Default::default()}
 
     }
+
+
+
+
+
+    pub fn __get_env_data(& mut self,node:&Node)->EnvData
+    {
+        let envdata_ident = self.__get_ident(&node);
+        let byte_size  = self.__get_descendantText(&node, "BYTE-SIZE");
+        let mut params = Vec::new();
+        for paramnode in  node.descendants()
+        {
+            if paramnode.tag_name().name() == "PARAM"
+            {
+            let param = self.__get_param(&paramnode);
+            params.push(param);
+            }
+        }
+        EnvData { ident: envdata_ident, params: params }
+
+    }
+
+
 
     pub fn __get_param(& mut self,node:&Node)->Param
     {
@@ -456,6 +527,67 @@ impl<'b> ODXParser
         }
     }
 
+    pub fn __get_diag_service(&mut self,node:&Node)->DiagSerivce
+    {
+        let ident = self.__get_ident(node);
+        let semantic = node.attribute("SEMANTIC").map(|s|String::from(s));
+        let request_ref = node.children().find(|n|n.tag_name().name() == "REQUEST-REF").map(|node|String::from(node.attribute("ID-REF").unwrap())).unwrap();
+        let positive_resp_ref = node.children().find(|n|n.tag_name().name() == "POS-RESPONSE-REF").map(|node|String::from(node.attribute("ID-REF").unwrap()));
+        let negative_resp_ref = node.children().find(|n|n.tag_name().name() == "NEG-RESPONSE-REF").map(|node|String::from(node.attribute("ID-REF").unwrap()));
+        let func_class_ref = node.children().find(|n|n.tag_name().name() == "FUNCT-CLASS-REF").map(|node|String::from(node.attribute("ID-REF").unwrap()));
+       
+        DiagSerivce{
+            ident:ident,
+            semantic:semantic,
+            request_ref:request_ref,
+            pos_response_ref:positive_resp_ref,
+            neg_response_ref:negative_resp_ref,
+            func_class_ref:func_class_ref,
+            ..Default::default()
+        }
+    }
+
+    pub fn __get_serive_msg(&mut self,node:&Node)->SeviceMsgPayload
+    {
+        let ident = self.__get_ident(node);
+
+        let mut smp=  SeviceMsgPayload{ident:ident,params:Vec::new()};
+        let mut params = Vec::new();
+        for ele in node.descendants()
+        {
+           if ele.tag_name().name() == "PARAM"
+           {
+            let param = self.__get_param(&ele);
+            params.push(param);
+
+           }
+        }
+        smp.params = params;
+        return smp;
+
+    }
+
+
+    pub fn __get_comparm_ref(&mut self,node:&Node)->ComParam
+    {
+        let id_ref = node.attribute("ID-REF").map(|s|String::from(s)).unwrap();
+        let doc_ref = node.attribute("DOCREF").map(|s|String::from(s));
+        let doc_type = node.attribute("DOCTYPE").map(|s|String::from(s));
+        let mut value = self.__get_descendantText(node, "VALUE").map(|s|String::from(s));
+        if value == None
+        {
+            value = self.__get_descendantText(node, "SIMPLE-VALUE").map(|s|String::from(s));
+        }
+        ComParam { ref_id: id_ref, doc_type: doc_type, doc_ref:doc_ref,value: value }
+    
+    
+        
+    
+    
+    }
+
+
+
     pub fn __parseDocument<'c>(&mut self,doc:&'c Document)->()
     {
         
@@ -466,18 +598,7 @@ impl<'b> ODXParser
             if name == "BASE-VARIANT"
             {
                 let ident = self.__get_ident(&ele);
-                let mut variant = Variant{
-                    id:ident,
-                    func_classes:HashMap::new(),
-                    dtc_object_props:HashMap::new(),
-                    data_object_props:HashMap::new(),
-                    env_data_descs:HashMap::new(),
-                    structures:HashMap::new(),
-                    static_fileds:HashMap::new(),
-                    dynamic_fileds:HashMap::new(),
-                    endofpdu_fileds:HashMap::new(),
-
-                };
+                let mut variant = Variant::default();
                 
                 
                 for desdentnode in ele.descendants()
@@ -530,6 +651,43 @@ impl<'b> ODXParser
                         dataprop.variant_id = variant.id.id.clone();
                         variant.endofpdu_fileds.insert(dataprop.ident.id.clone(), Box::new(dataprop));
                     }
+                    else if  desdentnode.tag_name().name() == "UNIT"
+                    {
+                        let mut dataprop = self.__get_unit(&desdentnode);
+                        
+                        variant.units.insert(dataprop.ident.id.clone(), Box::new(dataprop));
+                    }
+
+                    else if  desdentnode.tag_name().name() == "DIAG-SERVICE"
+                    {
+                        let mut dataprop = self.__get_diag_service(&desdentnode);
+                        
+                        variant.diag_comms.insert(dataprop.ident.id.clone(), Box::new(dataprop));
+                    }
+                    else if  desdentnode.tag_name().name() == "REQUEST"
+                    {
+                        let mut dataprop = self.__get_serive_msg(&desdentnode);
+                        
+                        variant.requests.insert(dataprop.ident.id.clone(), Box::new(ServiceMsgType::Request(dataprop)));
+                    }
+                    else if  desdentnode.tag_name().name() == "POS-RESPONSE"
+                    {
+                        let mut dataprop = self.__get_serive_msg(&desdentnode);
+                        
+                        variant.pos_responses.insert(dataprop.ident.id.clone(), Box::new(ServiceMsgType::Request(dataprop)));
+                    }
+                    else if  desdentnode.tag_name().name() == "NEG-RESPONSE"
+                    {
+                        let mut dataprop = self.__get_serive_msg(&desdentnode);
+                        
+                        variant.neg_responses.insert(dataprop.ident.id.clone(), Box::new(ServiceMsgType::Request(dataprop)));
+                    }
+                    else if  desdentnode.tag_name().name() == "COMPARAM-REF"
+                    {
+                        let mut dataprop = self.__get_comparm_ref(&desdentnode);
+                        
+                        variant.comparam_refs.insert(dataprop.ref_id.clone(), Box::new(dataprop));
+                    }
                     
 
                 }
@@ -540,28 +698,4 @@ impl<'b> ODXParser
         }
 
     }
-}
-pub struct ServiceMsg
-{
-    id:Identity,
-    params:Vec<Box<Param>>
-}
-
-pub struct PosResponse
-{
-    msg:ServiceMsg,
-}
-pub struct NegResponse
-{
-    msg:ServiceMsg,
-}
-pub struct Request
-{
-    msg:ServiceMsg,
-}
-
-pub struct DiagSerivce
-{
-    id:Identity,
-    
 }

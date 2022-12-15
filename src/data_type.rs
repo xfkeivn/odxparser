@@ -132,12 +132,14 @@ pub struct ComParam
     pub value:Option<String>,
 }
 
-pub trait  DataType<I> {
+
+
+pub trait  InstanceType<I> {
     fn create_data_instance(&self,name:&str,byte_postion:u32,bit_position:u32)->I;
     fn is_high_low_byte_order(&self)->bool
     {return false;}
 }
-
+#[derive(Default)]
 pub struct DataObjectProp
 {
     pub physical_type:Option<PhysicalType>,
@@ -146,7 +148,7 @@ pub struct DataObjectProp
     pub compute_method:Option<Box<dyn ComputeMethod>>,
     pub unit_ref:Option<String>
 }
-
+#[derive(Default)]
 pub struct Structure
 {
     pub params:Vec<Box<Param>>,
@@ -157,6 +159,9 @@ pub struct Structure
    
 }
 
+
+
+
 #[derive(Default)]
 pub struct EnvDataDesc{
     pub ident:Identity,
@@ -164,13 +169,14 @@ pub struct EnvDataDesc{
     pub env_data_refs:Vec<String>,
     pub env_datas:Vec<EnvData>
 }
-
+#[derive(Default)]
 pub struct EnvData
 {
     pub ident:Identity,
     pub params:Vec<Param>
 
 }
+#[derive(Default)]
 pub struct MuxCase
 {
     pub shortname:String,
@@ -179,6 +185,7 @@ pub struct MuxCase
     pub switch_upper_lim:Option<u32>,
     pub is_default:bool
 }
+#[derive(Default)]
 pub struct MuxSwitch
 {
     pub byte_position:Option<u32>,
@@ -186,7 +193,7 @@ pub struct MuxSwitch
     pub bit_position:Option<u32>
 
 }
-
+#[derive(Default)]
 pub struct EndOfPDUField
 {
     pub ident:Identity,
@@ -195,7 +202,7 @@ pub struct EndOfPDUField
     pub basic_struct_ref:Option<String>,
     pub variant_id:String,
 }
-
+#[derive(Default)]
 pub struct Mux
 {
     pub ident:Identity,
@@ -205,7 +212,7 @@ pub struct Mux
     pub switch_key:MuxSwitch,
     pub case_start_byte_offset:Option<u32>
 }
-
+#[derive(Default)]
 pub struct StaticField
 {
    pub   ident:Identity,
@@ -215,7 +222,7 @@ pub struct StaticField
    pub   variant_id:String
 
 }
-
+#[derive(Default)]
 pub struct DynamicLengthField
 {
     pub ident:Identity,
@@ -226,14 +233,14 @@ pub struct DynamicLengthField
     pub byte_pos_length_determined_dop:Option<String>,
 }
 
-
+#[derive(Default)]
 pub struct DTCDOP
 {
     pub ident:Identity,
     pub dataObjectProp:DataObjectProp,
     pub dtcs:Vec<Box<DTC>>
 }
-
+#[derive(Default)]
 pub struct SeviceMsgPayload
 {
     pub ident:Identity,
@@ -255,4 +262,14 @@ pub struct DiagSerivce
     pub pos_response_ref:Option<String>,
     pub neg_response_ref:Option<String>,
     pub func_class_ref:Option<String>    
+}
+
+pub enum DataTypeEnum<'a> {
+    DiagCodedType(&'a DiagCodedType),
+    StaticField(&'a StaticField),
+    DynamicLengthField(&'a DynamicLengthField),
+    Structure(&'a Structure),
+    Mux(&'a Mux),
+    DataObjectProp(&'a DataObjectProp),
+    EndOfPDUField(&'a EndOfPDUField)
 }

@@ -1,9 +1,8 @@
 
-use std::rc::Rc;
-
+use std::{rc::Rc, fmt::format};
 use bitvec::prelude::*;
-
-use crate::data_type::{DataType, ComputeMethod,InternalConstrain};
+use std::cell::*;
+use crate::data_type::{InstanceType, ComputeMethod,InternalConstrain, DiagCodedType, DataObjectProp, Structure, DataTypeEnum};
 
 #[derive(Debug)]
 pub enum DataInstanceValue
@@ -16,7 +15,7 @@ pub enum DataInstanceValue
 
 }
 
-pub trait TDataInstance< P> 
+pub trait TDataInstance<'a> 
 {
     fn is_high_low_byte_order(&self)->bool
     {
@@ -26,7 +25,7 @@ pub trait TDataInstance< P>
     {
 
     }
-    fn get_name(&self)->&str;
+  
     fn get_bit_length(&self)->usize
     {
         return usize::default();
@@ -35,35 +34,30 @@ pub trait TDataInstance< P>
     {
         return usize::default();
     }
-    fn get_full_name(&self)->&str
-    {
-        return self.get_name();
-    }
-    fn get_parameter_key(&self)->&str
-    {
-        return self.get_name();
-    }
-   
-    fn reset(&self)
-    {
+    fn get_full_name(&self)->String;
+    fn get_type(&self)->DataTypeEnum;
+    fn get_parameter_key(&self)->String;
+    fn reset(&self){}
+    fn set_pending(&self,paramname:&str,pending_value:Vec<u8>)
+    {}
 
-    }
-    fn get_parent(&self)->&P;
-    fn set_pending(&self,paramname:&str,pending_value:Vec<u8>);
-
+    fn get_parent(&self)->&Option<&'a dyn TDataInstance>;
+    fn set_parent(&self,parent:Option<&'a dyn TDataInstance>);
 
 }
 
 
+
 #[derive(Default)]
-pub struct DataInstance<P,T> where P:TDataInstance<P>,T:DataType<Self>
+pub struct DataInstanceCore<'a,T>
 {
-    name:String,
-    longname:String,
-    bytePostiion:u32,
-    bitPosition:u32,
-    parent:Box<P>,
-    datatype:Rc<T>,
+    pub name:String,
+    pub full_name:String,
+    pub long_name:String,
+    pub byte_postiion:u32,
+    pub bit_position:u32,
+    pub parent:Option<&'a dyn TDataInstance<'a>>,
+    pub datatype:Rc<T>,
     // for request data only
     pub pending_value:Option<Vec<u8>>,
     pub nominal_value:Option<Vec<u8>>,
@@ -71,76 +65,87 @@ pub struct DataInstance<P,T> where P:TDataInstance<P>,T:DataType<Self>
     pub current_value:Option<Vec<u8>>,
 }
 
-
-impl<P,T>  TDataInstance<P> for DataInstance<P,T> where P:TDataInstance<P>+Default,T:DataType<Self>
+pub struct CodedDataDataInstance<'a>
 {
-    fn get_name(&self)->&str {
-        return &self.name.as_str()
-    }
-
-    fn get_parent(&self)->&P
-    {
-        return self.parent.as_ref();
-    }
-    
-    fn set_pending(&self,paramname:&str,pending_value:Vec<u8>)
-    {
-        if paramname.contains('.') 
-        {panic!("This is the leaf data instance")}
-        else {
-            
-        }
-    }
-
-   
-} 
-
-pub struct CodedDataDataInstance<P,T> where P:TDataInstance<P>+Default,T:DataType<Self>
-{
-    pub data_instance:DataInstance<P,T>,
+    pub instance_core:DataInstanceCore<'a,DiagCodedType>,
     pub coded_value:u64,
     pub bit_length:u32
 }
 
-pub struct SimpleDataDataInstance<P:TDataInstance<P>+Default,T:DataType<Self>>
+pub struct DataObjectPropDataInstance<'a>
 {
-    pub data_instance:DataInstance<P,T>,
-}
-
-pub struct DataObjectPropDataInstance<P:TDataInstance<P>+Default,T:DataType<Self>>
-{
-    pub data_instance:DataInstance<P,T>,
+    pub instance_core:DataInstanceCore<'a,DataObjectProp>,
     pub compute_method:&'a dyn ComputeMethod,
     pub interal_constraint:InternalConstrain,
     pub unit_ref_id:String
 }
-
-pub struct StructureDataInstance<P,T> where P:TDataInstance<P>+Default,T:DataType<Self>
+#[derive(Default)]
+pub struct StructureDataInstance<'a>
 {
-    pub data_instance:DataInstance<P,T>,
-    pub internal_data_instances:Vec<& dyn TDataInstance<Self>>
+    pub instance_core:DataInstanceCore<'a,Structure>,
+    pub internal_data_instances:Vec<&'a dyn TDataInstance<'a>>
 }
 
-impl<P,T> StructureDataInstance<P,T> where P:TDataInstance<P>+Default,T:DataType<Self>
+impl<'a> StructureDataInstance<'a>
 {
-    pub fn get_interal_dataInstance(&self)->&Vec<& dyn TDataInstance<Self>>
+    pub fn get_interal_dataInstance(&self)->&Vec<&'a dyn TDataInstance>
     {
 
         return &self.internal_data_instances
     }
 }
 
-impl<P,T> TDataInstance<P> for StructureDataInstance<P,T> where P:TDataInstance<P>+Default,T:TDataInstance<Self>
+impl<'a> TDataInstance<'a> for StructureDataInstance<'a>
 {
-
-    fn get_name(&self)->&str {
-        return &&self.data_instance.name.as_str()
+    fn get_type(&self)->DataTypeEnum {
+        return DataTypeEnum::Structure(&self.instance_core.datatype);
     }
-
-    fn get_parent(&self)->&P
+    fn get_parent(&self)->&Option<&'a dyn TDataInstance>
     {
-        return &self.data_instance.parent
+        return &self.instance_core.parent
     }
+    fn set_parent(&self,parent:Option<&'a dyn TDataInstance>)
+    {
+
+    }
+    
+    fn get_full_name(&self)->String
+    {
+        let parent = self.instance_core.parent;
+        let full_name;
+        match  parent
+        {
+        Some(p)=>{
+            match p.get_type()
+            {
+               DataTypeEnum::StaticField(s)=>{
+                   
+                },
+                _=>{
+
+                }
+            }
+
+            let str = p.get_full_name();
+            full_name = format!("{}.{}",str,self.instance_core.name.as_str());
+            
+
+        },
+        _=>{
+         full_name = self.instance_core.name.clone();
+        }
+        }
+        return full_name;
+
+                
+            
+        }
+    
+    fn get_parameter_key(&self)->String
+    {
+        return self.get_full_name();
+    }
+   
 
     fn set_pending(&self,param:&str,pending_value:Vec<u8>)
     {

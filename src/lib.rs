@@ -9,6 +9,8 @@ pub mod data_type;
 use data_instance::*;
 #[cfg(test)]
 mod tests {
+    use crate::data_type::Structure;
+
     use super::*;
 
 
@@ -57,11 +59,15 @@ mod tests {
 
     #[test]
     fn test() {
-        
-        let struct_instance = StructureDataInstance
-        {data_instance:DataInstance<>{},
-         internal_data_instances::Vec<    
-    };
+        //let parent = DataInstanceCore::default();
+        let struct_instance:StructureDataInstance=StructureDataInstance{
+            instance_core:DataInstanceCore{
+                name:String::from("TestInstance"),
+                ..Default::default()
+            },
+            ..Default::default()};
+        let name = struct_instance.get_full_name();
+        println!("{}",name);
 
     }
 

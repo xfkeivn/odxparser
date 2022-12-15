@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 bv = "0.11.1"
 roxmltree = "0.16.0"
+bitvec = "1"

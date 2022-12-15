@@ -54,9 +54,16 @@ pub struct Textable;
 #[derive(Debug)]
 pub struct Linear;
 #[derive(Debug)]
-pub struct InternalConstrain;
+pub struct InternalConstrain
+{
+    pub scales:Vec<InternalConstrainScale>
+}
 #[derive(Debug)]
-pub struct InternalConstrainScale;
+pub struct InternalConstrainScale
+{
+    pub upper_limit:u64,
+    pub lower_limit:u64
+}
 #[derive(Debug)]
 pub struct Unit
 {
@@ -125,15 +132,10 @@ pub struct ComParam
     pub value:Option<String>,
 }
 
-pub trait  DataType {
-    fn create_data_instance(&self,name:&str,byte_postion:u32,bit_position:u32)->& dyn TDataInstance
-    {
-        panic!("");
-    }
+pub trait  DataType<I> {
+    fn create_data_instance(&self,name:&str,byte_postion:u32,bit_position:u32)->I;
     fn is_high_low_byte_order(&self)->bool
-    {
-        return false;
-    }
+    {return false;}
 }
 
 pub struct DataObjectProp

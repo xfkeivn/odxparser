@@ -6,7 +6,7 @@ pub fn add(left: usize, right: usize) -> usize {
 pub mod parser;
 pub mod data_instance;
 pub mod data_type;
-
+use data_instance::*;
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -57,8 +57,11 @@ mod tests {
 
     #[test]
     fn test() {
-        parsing();
-      
+        
+        let struct_instance = StructureDataInstance
+        {data_instance:DataInstance<>{},
+         internal_data_instances::Vec<    
+    };
 
     }
 

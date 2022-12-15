@@ -126,11 +126,11 @@ pub struct ComParam
 }
 
 pub trait  DataType {
-    fn create_data_instance(&self,name:&str,byte_postion:u32,bit_position:u32)->&TDataInstance
+    fn create_data_instance(&self,name:&str,byte_postion:u32,bit_position:u32)->& dyn TDataInstance
     {
-
+        panic!("");
     }
-    fn is_high_low_byte_order(&self)
+    fn is_high_low_byte_order(&self)->bool
     {
         return false;
     }

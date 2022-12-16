@@ -9,6 +9,8 @@ pub mod data_type;
 use data_instance::*;
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
+
     use crate::data_type::Structure;
 
     use super::*;
@@ -60,15 +62,37 @@ mod tests {
     #[test]
     fn test() {
         //let parent = DataInstanceCore::default();
-        let struct_instance:StructureDataInstance=StructureDataInstance{
+        let mut parent_instance:StructureDataInstance=StructureDataInstance{
             instance_core:DataInstanceCore{
                 name:String::from("TestInstance"),
                 ..Default::default()
             },
             ..Default::default()};
-        let name = struct_instance.get_full_name();
+        let name = parent_instance.get_full_name();
         println!("{}",name);
+    let parent=   Rc::new(parent_instance);
+    println!("{}",Rc::strong_count(&parent));
+    let parent2 = parent.clone();
+    println!("{}",Rc::strong_count(&parent2));
 
+    for i in 1..=100
+    {
+        let mut child_instance:StructureDataInstance=StructureDataInstance{
+            instance_core:DataInstanceCore{
+                name:String::from(format!("{}{}","ChildInstance",i)),
+                
+                ..Default::default()
+            },
+            ..Default::default()};
+            let weakp = Rc::downgrade(&parent);
+            println!("{}",Rc::strong_count(&parent));
+            println!("{}",Rc::weak_count(&parent));
+            child_instance.set_parent(weakp);
+            parent_instance.internal_data_instances.push(Rc::new(child_instance));
     }
+    
+    }
+
+    
 
 }

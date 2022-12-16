@@ -263,13 +263,3 @@ pub struct DiagSerivce
     pub neg_response_ref:Option<String>,
     pub func_class_ref:Option<String>    
 }
-
-pub enum DataTypeEnum<'a> {
-    DiagCodedType(&'a DiagCodedType),
-    StaticField(&'a StaticField),
-    DynamicLengthField(&'a DynamicLengthField),
-    Structure(&'a Structure),
-    Mux(&'a Mux),
-    DataObjectProp(&'a DataObjectProp),
-    EndOfPDUField(&'a EndOfPDUField)
-}

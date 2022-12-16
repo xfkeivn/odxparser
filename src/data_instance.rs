@@ -1,8 +1,7 @@
 
-use std::{rc::Rc, fmt::format};
+use std::{rc::{Rc, Weak}, any::Any};
 use bitvec::prelude::*;
-use std::cell::*;
-use crate::data_type::{InstanceType, ComputeMethod,InternalConstrain, DiagCodedType, DataObjectProp, Structure, DataTypeEnum};
+use crate::data_type::{ComputeMethod,InternalConstrain, DiagCodedType, DataObjectProp, Structure};
 
 #[derive(Debug)]
 pub enum DataInstanceValue
@@ -34,18 +33,31 @@ pub trait TDataInstance<'a>
     {
         return usize::default();
     }
-    fn get_full_name(&self)->String;
-    fn get_type(&self)->DataTypeEnum;
-    fn get_parameter_key(&self)->String;
+    fn get_full_name(&self)->String
+    {
+        return String::new();
+    }
+    fn get_parameter_key(&self)->String
+    {
+        
+         return String::new();
+        
+    }
     fn reset(&self){}
     fn set_pending(&self,paramname:&str,pending_value:Vec<u8>)
     {}
 
-    fn get_parent(&self)->&Option<&'a dyn TDataInstance>;
-    fn set_parent(&self,parent:Option<&'a dyn TDataInstance>);
+
+    fn get_parent(&self)->&Option<Weak<dyn TDataInstance<'a>>>
+    {
+        return &Option::None;
+    }
+    fn set_parent(& mut self,parent:Weak<dyn TDataInstance<'a>>)
+    {
+
+    }
 
 }
-
 
 
 #[derive(Default)]
@@ -55,8 +67,8 @@ pub struct DataInstanceCore<'a,T>
     pub full_name:String,
     pub long_name:String,
     pub byte_postiion:u32,
+    pub parent:Option<Weak<dyn TDataInstance<'a>>>,
     pub bit_position:u32,
-    pub parent:Option<&'a dyn TDataInstance<'a>>,
     pub datatype:Rc<T>,
     // for request data only
     pub pending_value:Option<Vec<u8>>,
@@ -79,16 +91,51 @@ pub struct DataObjectPropDataInstance<'a>
     pub interal_constraint:InternalConstrain,
     pub unit_ref_id:String
 }
+
+pub struct StaticFieldInstance<'a>
+{ 
+    pub instance_core:DataInstanceCore<'a,DataObjectProp>,
+
+}
+
+
+impl<'a> StaticFieldInstance<'a> {
+    fn get_element_name(&self)->String {
+        
+        return String::new();
+    }
+    
+}
+impl<'a> TDataInstance<'a> for StaticFieldInstance<'a> {
+    
+  
+}
+
+pub struct DynamicLengthFieldInstance<'a>
+{ 
+    pub instance_core:DataInstanceCore<'a,DataObjectProp>,
+
+}
+pub struct MuxInstance<'a>
+{
+    pub instance_core:DataInstanceCore<'a,DataObjectProp>,
+}
+
+pub struct EndOfPDUFieldInstance<'a>
+{
+    pub instance_core:DataInstanceCore<'a,DataObjectProp>,
+}
+
 #[derive(Default)]
 pub struct StructureDataInstance<'a>
 {
     pub instance_core:DataInstanceCore<'a,Structure>,
-    pub internal_data_instances:Vec<&'a dyn TDataInstance<'a>>
+    pub internal_data_instances:Vec<Rc<dyn TDataInstance<'a>>>
 }
 
 impl<'a> StructureDataInstance<'a>
 {
-    pub fn get_interal_dataInstance(&self)->&Vec<&'a dyn TDataInstance>
+    pub fn get_interal_data_instance(&self)->&Vec<Rc<dyn TDataInstance<'a>>>
     {
 
         return &self.internal_data_instances
@@ -97,39 +144,27 @@ impl<'a> StructureDataInstance<'a>
 
 impl<'a> TDataInstance<'a> for StructureDataInstance<'a>
 {
-    fn get_type(&self)->DataTypeEnum {
-        return DataTypeEnum::Structure(&self.instance_core.datatype);
-    }
-    fn get_parent(&self)->&Option<&'a dyn TDataInstance>
+    fn get_parent(&self)->&Option<Weak<dyn TDataInstance<'a>>>
     {
-        return &self.instance_core.parent
+        return &self.instance_core.parent;
     }
-    fn set_parent(&self,parent:Option<&'a dyn TDataInstance>)
+    fn set_parent(& mut self,parent:Weak<dyn TDataInstance<'a>>)
     {
-
+       
+        self.instance_core.parent = Some(parent);
     }
     
     fn get_full_name(&self)->String
     {
-        let parent = self.instance_core.parent;
+        let parent = &self.instance_core.parent;
         let full_name;
+        let parent_full_name:String;
         match  parent
         {
         Some(p)=>{
-            match p.get_type()
-            {
-               DataTypeEnum::StaticField(s)=>{
-                   
-                },
-                _=>{
-
-                }
-            }
-
-            let str = p.get_full_name();
-            full_name = format!("{}.{}",str,self.instance_core.name.as_str());
+          
+            full_name = format!("{}.{}",p.upgrade().unwrap().get_full_name(),self.instance_core.name.as_str());
             
-
         },
         _=>{
          full_name = self.instance_core.name.clone();

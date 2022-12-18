@@ -1,5 +1,6 @@
 
-use std::{rc::{Rc, Weak}, any::Any};
+use std::{rc::{Rc, Weak}, any::Any, borrow::Borrow};
+use std::cell::RefCell;
 use bitvec::prelude::*;
 use crate::data_type::{ComputeMethod,InternalConstrain, DiagCodedType, DataObjectProp, Structure};
 
@@ -14,7 +15,7 @@ pub enum DataInstanceValue
 
 }
 
-pub trait TDataInstance<'a> 
+pub trait TDataInstance<'a,T>
 {
     fn is_high_low_byte_order(&self)->bool
     {
@@ -45,17 +46,14 @@ pub trait TDataInstance<'a>
     }
     fn reset(&self){}
     fn set_pending(&self,paramname:&str,pending_value:Vec<u8>)
-    {}
-
-
-    fn get_parent(&self)->&Option<Weak<dyn TDataInstance<'a>>>
-    {
-        return &Option::None;
-    }
-    fn set_parent(& mut self,parent:Weak<dyn TDataInstance<'a>>)
     {
 
     }
+
+    fn get_parent(&self)->&Option<&'a RefCell<&'a dyn TDataInstance<'a,T>>>;
+
+
+    fn set_parent(&mut self,parent:&'a  RefCell<&'a dyn TDataInstance<'a,T> >);
 
 }
 
@@ -67,7 +65,7 @@ pub struct DataInstanceCore<'a,T>
     pub full_name:String,
     pub long_name:String,
     pub byte_postiion:u32,
-    pub parent:Option<Weak<dyn TDataInstance<'a>>>,
+    pub parent:Option<&'a RefCell<&'a dyn TDataInstance<'a,T> >>,
     pub bit_position:u32,
     pub datatype:Rc<T>,
     // for request data only
@@ -106,10 +104,6 @@ impl<'a> StaticFieldInstance<'a> {
     }
     
 }
-impl<'a> TDataInstance<'a> for StaticFieldInstance<'a> {
-    
-  
-}
 
 pub struct DynamicLengthFieldInstance<'a>
 { 
@@ -130,40 +124,39 @@ pub struct EndOfPDUFieldInstance<'a>
 pub struct StructureDataInstance<'a>
 {
     pub instance_core:DataInstanceCore<'a,Structure>,
-    pub internal_data_instances:Vec<Rc<dyn TDataInstance<'a>>>
+    pub children_instances:Vec<&'a dyn Any>
+    
 }
 
 impl<'a> StructureDataInstance<'a>
 {
-    pub fn get_interal_data_instance(&self)->&Vec<Rc<dyn TDataInstance<'a>>>
-    {
 
-        return &self.internal_data_instances
-    }
 }
 
-impl<'a> TDataInstance<'a> for StructureDataInstance<'a>
+impl<'a> TDataInstance<'a,Structure> for StructureDataInstance<'a>  
 {
-    fn get_parent(&self)->&Option<Weak<dyn TDataInstance<'a>>>
+
+    fn get_parent(&self)->&Option<&'a RefCell<&'a dyn TDataInstance<'a,Structure>>>
     {
         return &self.instance_core.parent;
     }
-    fn set_parent(& mut self,parent:Weak<dyn TDataInstance<'a>>)
+
+    fn set_parent(&mut self,parent:&'a RefCell<&'a dyn TDataInstance<'a,Structure>>)
     {
        
-        self.instance_core.parent = Some(parent);
+       self.instance_core.parent = Some(parent);
     }
     
     fn get_full_name(&self)->String
     {
-        let parent = &self.instance_core.parent;
+        let parent = self.instance_core.parent;
         let full_name;
         let parent_full_name:String;
         match  parent
         {
         Some(p)=>{
           
-            full_name = format!("{}.{}",p.upgrade().unwrap().get_full_name(),self.instance_core.name.as_str());
+            full_name = format!("{}.{}",p.borrow().get_full_name(),self.instance_core.name.as_str());
             
         },
         _=>{
@@ -175,25 +168,14 @@ impl<'a> TDataInstance<'a> for StructureDataInstance<'a>
                 
             
         }
-    
-    fn get_parameter_key(&self)->String
-    {
-        return self.get_full_name();
-    }
+
    
 
     fn set_pending(&self,param:&str,pending_value:Vec<u8>)
     {
         if param == ""
         {
-            for instance in &self.internal_data_instances
-            {
-               let bit_length =  instance.get_bit_length();
-               let bit_position = instance.get_bit_position();
-
-               let bits= pending_value.view_bits::<Lsb0>();
-               let bytes = bits.chunks(8);
-            }
+           
             
             
         }

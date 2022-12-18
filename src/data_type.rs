@@ -1,7 +1,22 @@
+use std::any::Any;
 use std::collections::HashMap;
 use std::rc::{Rc, Weak};
-use std::vec;
+use std::{vec, default};
 use crate::data_instance::*;
+
+
+
+pub trait DataType{
+    type I;
+    fn create_data_instance(&self,name:&str,byte_postion:u32,bit_position:u32)->Self::I;
+    fn is_high_low_byte_order(&self)->bool
+    {return false;}
+}
+
+
+
+
+
 #[derive(Debug,PartialEq)]
 #[derive(Default)]
 pub struct Identity
@@ -70,7 +85,6 @@ pub struct Unit
     pub ident:Identity,
     pub display_name:String
 }
-#[derive(Debug)]
 
 pub struct Param
 {
@@ -85,9 +99,20 @@ pub struct Param
     pub aa_type:Option<String>,
     pub variant_id:String,
     pub physical_constant_value:Option<u32>,
-    pub diag_coded_type:Option<DiagCodedType>
+    pub diag_coded_type:Option<DiagCodedType>,
+    pub variant:Rc<Variant>
 }
 
+impl <'a >DataType for Param {
+    type I = &'a dyn TDataInstance<Self,'a>;
+    fn create_data_instance(&self,name:&str,byte_postion:u32,bit_position:u32)->dyn TDataInstance<'a,Self>
+    {
+        let param_datatype = self.variant.data_object_props.get(&self.dop_ref.unwrap());
+      
+
+    }
+    
+}
 
 
 impl ComputeMethod for ScaleLinear{}
@@ -134,20 +159,29 @@ pub struct ComParam
 
 
 
-pub trait  InstanceType<I> {
-    fn create_data_instance(&self,name:&str,byte_postion:u32,bit_position:u32)->I;
-    fn is_high_low_byte_order(&self)->bool
-    {return false;}
-}
-#[derive(Default)]
 pub struct DataObjectProp
 {
     pub physical_type:Option<PhysicalType>,
     pub diag_coded_type:Option<DiagCodedType>,
     pub ident:Identity,
     pub compute_method:Option<Box<dyn ComputeMethod>>,
-    pub unit_ref:Option<String>
+    pub unit_ref:Option<String>,
+  
 }
+
+
+impl<'a> DataType for DataObjectProp
+{
+    fn create_data_instance(&self,name:&str,byte_postion:u32,bit_position:u32)->DataObjectPropDataInstance
+    {
+        DataObjectPropDataInstance{
+           ..Default::default()
+        }
+
+    }
+}
+
+
 #[derive(Default)]
 pub struct Structure
 {
@@ -159,6 +193,13 @@ pub struct Structure
    
 }
 
+impl DataType for Structure {
+    fn create_data_instance(&self,name:&str,byte_postion:u32,bit_position:u32)->StructureDataInstance
+    {
+        return StructureDataInstance{..Default::default()};
+    }
+    
+}
 
 
 
@@ -233,7 +274,7 @@ pub struct DynamicLengthField
     pub byte_pos_length_determined_dop:Option<String>,
 }
 
-#[derive(Default)]
+
 pub struct DTCDOP
 {
     pub ident:Identity,
@@ -262,4 +303,10 @@ pub struct DiagSerivce
     pub pos_response_ref:Option<String>,
     pub neg_response_ref:Option<String>,
     pub func_class_ref:Option<String>    
+}
+
+
+fn create_data_instance<T>(datatype:T)
+{
+
 }

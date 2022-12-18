@@ -1,4 +1,8 @@
 extern crate bv;
+use lazy_static::lazy_static;
+use std::collections::HashMap;
+use std::cell::RefCell;
+
 pub fn add(left: usize, right: usize) -> usize {
     left + right
 }
@@ -7,6 +11,20 @@ pub mod parser;
 pub mod data_instance;
 pub mod data_type;
 use data_instance::*;
+
+
+lazy_static! {
+    pub static ref MAP:HashMap<u32,&'static str> ={
+        let mut m = HashMap::new();
+        m.insert(0,"foo");
+        m
+    };
+}
+
+
+
+
+
 #[cfg(test)]
 mod tests {
     use std::rc::Rc;
@@ -61,8 +79,41 @@ mod tests {
 
     #[test]
     fn test() {
+        #[derive(Default,Debug)]
+        struct  A
+        {
+            a:u32
+            
+        }
+
+        let a = A{..Default::default()};
+
+        let b = &a;
+        let c = &a;
+        let h = c;
+
+        println!("{:?}",a);
+        println!("{:?}",a);
+        println!("{:?}",c);
+        println!("{:?}",b);
+
+        let mut d = a;
+        let e = &d;
+        let f = &mut d;
+        println!("{:?}",d);
+        //f.a = 200;
+        //d.a = 100;
+       // 
+
+
+
+
+
+
+
+
         //let parent = DataInstanceCore::default();
-        let mut parent_instance:StructureDataInstance=StructureDataInstance{
+        let parent_instance:StructureDataInstance=StructureDataInstance{
             instance_core:DataInstanceCore{
                 name:String::from("TestInstance"),
                 ..Default::default()
@@ -70,26 +121,30 @@ mod tests {
             ..Default::default()};
         let name = parent_instance.get_full_name();
         println!("{}",name);
-    let parent=   Rc::new(parent_instance);
-    println!("{}",Rc::strong_count(&parent));
-    let parent2 = parent.clone();
-    println!("{}",Rc::strong_count(&parent2));
+    
+    
+    //Rc::new();
+    //println!("{}",Rc::strong_count(&parent));
+    //let parent2 = parent.clone();
+    //println!("{}",Rc::strong_count(&parent2));
 
-    for i in 1..=100
-    {
-        let mut child_instance:StructureDataInstance=StructureDataInstance{
-            instance_core:DataInstanceCore{
-                name:String::from(format!("{}{}","ChildInstance",i)),
-                
-                ..Default::default()
+      let parent = RefCell::new(&parent_instance as & dyn TDataInstance<Structure>);
+       
+      
+      let mut child_instance:StructureDataInstance=StructureDataInstance{
+        instance_core:DataInstanceCore{
+            name:String::from(format!("{}{}","ChildInstance",1)),
+            ..Default::default()
             },
             ..Default::default()};
-            let weakp = Rc::downgrade(&parent);
-            println!("{}",Rc::strong_count(&parent));
-            println!("{}",Rc::weak_count(&parent));
-            child_instance.set_parent(weakp);
-            parent_instance.internal_data_instances.push(Rc::new(child_instance));
-    }
+            child_instance.set_parent(&parent);
+
+            let currnetparent = child_instance.get_parent();
+            
+            //child_instance.set_parent(&parent);        
+        
+        println!("11");
+    
     
     }
 

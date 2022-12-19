@@ -36,8 +36,8 @@ mod tests {
     #[test]
     fn parsing()
     {
-        let odxpath = r"D:\Workspace\RustApp\odxparser\src\CN180S_V1.0.80.odx";
-        //let odxpath = r"E:\WORKSPACE\RustApps\odx_parser\src\CN180S_V1.0.80.odx";
+        //let odxpath = r"D:\Workspace\RustApp\odxparser\src\CN180S_V1.0.80.odx";
+        let odxpath = r"E:\WORKSPACE\RustApps\odx_parser\src\CN180S_V1.0.80.odx";
         let mut parser = parser::ODXParser::new();
         parser.parse(odxpath);
         for (key,variant) in parser.variants.iter()
@@ -46,13 +46,17 @@ mod tests {
             for (k,v) in variant.diag_comms.iter()
             {
                
-                let request = variant.as_ref().requests.get(k);
+                let diag_service = variant.as_ref().diag_comms.get(k);
 
                 let mut serviceInstance = DiagServiceInstance{..Default::default()};
 
-                if let ServiceMsgType::Request(p)= request.unwrap().as_ref()
-                {   let mut request_instance = ServiceMessageInstance{..Default::default()};
-                    for param in p.params.iter()
+                if let Some(p)= variant.as_ref().requests.get(&diag_service.unwrap().request_ref)
+                {   
+                    if let ServiceMsgType::Request(p2) = p.as_ref()
+                    {
+                        let mut request_instance = ServiceMessageInstance{..Default::default()};
+
+                    for param in p2.params.iter()
                     {
                         let param_instance = param.create_data_instance();
                         request_instance.param_instances.push(param_instance);
@@ -60,28 +64,51 @@ mod tests {
                     }
                     serviceInstance.request_instance = request_instance;
 
-                }
-                else if let ServiceMsgType::PositiveResponse(p)= request.unwrap().as_ref()  {
-                    let mut positive_instance = ServiceMessageInstance{..Default::default()};
-                    for param in p.params.iter()
-                    {
-                        let param_instance = param.create_data_instance();
-                        positive_instance.param_instances.push(param_instance);
-                        
                     }
-                    serviceInstance.positive_response_instance = positive_instance;
+                    
 
                 }
-                else if let ServiceMsgType::NegativeReponse(p)= request.unwrap().as_ref()  {
-                    let mut negative_instance = ServiceMessageInstance{..Default::default()};
-                    for param in p.params.iter()
-                    {
-                        let param_instance = param.create_data_instance();
-                        negative_instance.param_instances.push(param_instance);
+                if diag_service.unwrap().pos_response_ref.is_some()
+                {
+                    if let Some(p)= variant.as_ref().pos_responses.get(diag_service.unwrap().pos_response_ref.as_ref().unwrap())
+                    {   
+                        if let ServiceMsgType::PositiveResponse(p2) = p.as_ref()
+                        {
+                            let mut response_instance = ServiceMessageInstance{..Default::default()};
+    
+                        for param in p2.params.iter()
+                        {
+                            let param_instance = param.create_data_instance();
+                            response_instance.param_instances.push(param_instance);
+                            
+                        }
+                        serviceInstance.positive_response_instance = response_instance;
+    
+                        }
                         
+    
                     }
-                    serviceInstance.positive_response_instance = negative_instance;
-
+                }
+                if diag_service.unwrap().neg_response_ref.is_some()
+                {
+                    if let Some(p)= variant.as_ref().neg_responses.get(diag_service.unwrap().neg_response_ref.as_ref().unwrap())
+                    {   
+                        if let ServiceMsgType::NegativeReponse(p2) = p.as_ref()
+                        {
+                            let mut neg_response_instance = ServiceMessageInstance{..Default::default()};
+    
+                        for param in p2.params.iter()
+                        {
+                            let param_instance = param.create_data_instance();
+                            neg_response_instance.param_instances.push(param_instance);
+                            
+                        }
+                        serviceInstance.negative_response_instance = neg_response_instance;
+    
+                        }
+                        
+    
+                    }
                 }
               
             }

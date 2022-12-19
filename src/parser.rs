@@ -604,7 +604,7 @@ impl<'b> ODXParser
                 
                 for desdentnode in ele.descendants()
                 {
-                    //println!("{}",desdentnode.tag_name().name());
+                    println!("{}",desdentnode.tag_name().name());
                     if desdentnode.tag_name().name() == "FUNCT-CLASS"
                     {
                         let funclass = self.__get_func_class(&desdentnode);

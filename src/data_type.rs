@@ -3,18 +3,14 @@ use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 use std::{vec, default};
 use crate::data_instance::*;
-
-
-
+use std::cell::{RefCell};
 pub trait DataType{
     type I;
-    fn create_data_instance(&self,name:&str,byte_postion:u32,bit_position:u32)->Self::I;
+    fn create_data_instance(self: Rc<Self>,name:&str,byte_postion:u32,bit_position:u32)->Rc<RefCell<Self::I>>;
     fn is_high_low_byte_order(&self)->bool
     {return false;}
+
 }
-
-
-
 
 
 #[derive(Debug,PartialEq)]
@@ -39,25 +35,21 @@ pub trait ComputeMethod {
 pub struct  Variant
 {
     pub id:Identity,
-    pub dtc_object_props:HashMap<String,Box<DTCDOP>>,
-    pub data_object_props:HashMap<String,Box<DataObjectProp>>,
-    pub env_data_descs:HashMap<String,Box<EnvDataDesc>>,
-    pub structures:HashMap<String,Box<Structure>>,
-    pub static_fileds:HashMap<String,Box<StaticField>>,
-    pub dynamic_fileds:HashMap<String,Box<DynamicLengthField>>,
-    pub endofpdu_fileds:HashMap<String,Box<EndOfPDUField>>,
-    pub units:HashMap<String,Box<Unit>>,
-    pub diag_comms:HashMap<String,Box<DiagSerivce>>,
-    pub requests:HashMap<String,Box<ServiceMsgType>>,
-    pub pos_responses:HashMap<String,Box<ServiceMsgType>>,
-    pub neg_responses:HashMap<String,Box<ServiceMsgType>>,
-    pub comparam_refs:HashMap<String,Box<ComParam>>,     
-    pub func_classes:HashMap<String,Box<FunctionClass>>,
+    pub dtc_object_props:HashMap<String,Rc<DTCDOP>>,
+    pub data_object_props:HashMap<String,Rc<DataObjectProp>>,
+    pub env_data_descs:HashMap<String,Rc<EnvDataDesc>>,
+    pub structures:HashMap<String,Rc<Structure>>,
+    pub static_fileds:HashMap<String,Rc<StaticField>>,
+    pub dynamic_fileds:HashMap<String,Rc<DynamicLengthField>>,
+    pub endofpdu_fileds:HashMap<String,Rc<EndOfPDUField>>,
+    pub units:HashMap<String,Rc<Unit>>,
+    pub diag_comms:HashMap<String,Rc<DiagSerivce>>,
+    pub requests:HashMap<String,Rc<ServiceMsgType>>,
+    pub pos_responses:HashMap<String,Rc<ServiceMsgType>>,
+    pub neg_responses:HashMap<String,Rc<ServiceMsgType>>,
+    pub comparam_refs:HashMap<String,Rc<ComParam>>,     
+    pub func_classes:HashMap<String,Rc<FunctionClass>>,
 }
-
-
-
-
 
 
 #[derive(Debug)]
@@ -100,15 +92,41 @@ pub struct Param
     pub variant_id:String,
     pub physical_constant_value:Option<u32>,
     pub diag_coded_type:Option<DiagCodedType>,
-    pub variant:Rc<Variant>
+    pub variant:Option<Rc<Variant>>
 }
 
-impl <'a >DataType for Param {
-    type I = &'a dyn TDataInstance<Self,'a>;
-    fn create_data_instance(&self,name:&str,byte_postion:u32,bit_position:u32)->dyn TDataInstance<'a,Self>
+impl Param {
+    
+    pub fn create_data_instance(&self,)->Rc<RefCell<dyn TDataInstance>>
     {
-        let param_datatype = self.variant.data_object_props.get(&self.dop_ref.unwrap());
+        let name = &self.shortname;
+        let byte_position = self.byte_position.unwrap();
+        let bit_position = self.bit_position.unwrap();
+        if let Some(p) = self.variant.as_ref().unwrap().data_object_props.get(self.dop_ref.as_ref().unwrap())
+        {
+           p.clone().create_data_instance(name, byte_position, bit_position)
+        }
+        else if let Some(p) =self.variant.as_ref().unwrap().structures.get(self.dop_ref.as_ref().unwrap())
+        {
+            p.clone().create_data_instance(name, byte_position, bit_position)
+        }
+        else if let Some(p) =self.variant.as_ref().unwrap().static_fileds.get(self.dop_ref.as_ref().unwrap())
+        {
+            p.clone().create_data_instance(name, byte_position, bit_position)
+        }
       
+        else if let Some(p) =self.variant.as_ref().unwrap().env_data_descs.get(self.dop_ref.as_ref().unwrap())
+        {
+            p.clone().create_data_instance(name, byte_position, bit_position)
+        }
+        else if let Some(p) =self.variant.as_ref().unwrap().static_fileds.get(self.dop_ref.as_ref().unwrap())
+        {
+            p.clone().create_data_instance(name, byte_position, bit_position)
+        }
+        else {
+            panic!("")
+        }
+       
 
     }
     
@@ -158,7 +176,7 @@ pub struct ComParam
 }
 
 
-
+#[derive(Default)]
 pub struct DataObjectProp
 {
     pub physical_type:Option<PhysicalType>,
@@ -169,22 +187,31 @@ pub struct DataObjectProp
   
 }
 
+impl DataObjectProp {
+    fn get(self)->Self 
+    {return self}
+    
+}
 
-impl<'a> DataType for DataObjectProp
+impl DataType for DataObjectProp
 {
-    fn create_data_instance(&self,name:&str,byte_postion:u32,bit_position:u32)->DataObjectPropDataInstance
+    type I = DataObjectPropDataInstance;
+    fn create_data_instance(self: Rc<Self>,name:&str,byte_postion:u32,bit_position:u32)->Rc<RefCell<Self::I>>
     {
-        DataObjectPropDataInstance{
-           ..Default::default()
-        }
+       let di =  DataObjectPropDataInstance{
+            instance_core:DataInstanceCore{datatype:self.clone() ,..Default::default()},
+        };
+        return Rc::new(RefCell::new(di));
 
     }
+
 }
 
 
 #[derive(Default)]
 pub struct Structure
 {
+
     pub params:Vec<Box<Param>>,
     pub ident:Identity,
     pub bytesize:Option<u32>,
@@ -194,9 +221,23 @@ pub struct Structure
 }
 
 impl DataType for Structure {
-    fn create_data_instance(&self,name:&str,byte_postion:u32,bit_position:u32)->StructureDataInstance
+    type I = StructureDataInstance;
+    fn create_data_instance(self: Rc<Self>,name:&str,byte_postion:u32,bit_position:u32)->Rc<RefCell<Self::I>>
     {
-        return StructureDataInstance{..Default::default()};
+        let di = Rc::new(RefCell::new(StructureDataInstance{..Default::default()}));
+        
+        for param in self.params.iter()
+        {   
+            let mut child = param.create_data_instance();
+            child.borrow_mut().set_parent(di.clone());
+            di.borrow_mut().children_instances.push(child);
+            
+           
+
+        }
+
+        return di;
+        
     }
     
 }
@@ -210,6 +251,25 @@ pub struct EnvDataDesc{
     pub env_data_refs:Vec<String>,
     pub env_datas:Vec<EnvData>
 }
+
+impl DataType for EnvDataDesc
+{
+    type I = EnvDataDescInstance;
+    fn create_data_instance(self: Rc<Self>,name:&str,byte_postion:u32,bit_position:u32)->Rc<RefCell<Self::I>>
+    {
+       
+      Rc::new(RefCell::new( EnvDataDescInstance{
+            instance_core:DataInstanceCore{datatype:self.clone() ,..Default::default()},
+           
+
+        }))
+
+    }
+
+}
+
+
+
 #[derive(Default)]
 pub struct EnvData
 {
@@ -263,6 +323,26 @@ pub struct StaticField
    pub   variant_id:String
 
 }
+
+impl DataType for StaticField
+{
+    type I = StaticFieldInstance;
+    fn create_data_instance(self: Rc<Self>,name:&str,byte_postion:u32,bit_position:u32)->Rc<RefCell<Self::I>>
+    {
+       let result =  Rc::new(RefCell::new(
+        StaticFieldInstance{
+            instance_core:DataInstanceCore{..Default::default()},
+           
+
+        }));
+
+        return result;
+    }   
+}
+
+
+
+
 #[derive(Default)]
 pub struct DynamicLengthField
 {
@@ -306,7 +386,3 @@ pub struct DiagSerivce
 }
 
 
-fn create_data_instance<T>(datatype:T)
-{
-
-}

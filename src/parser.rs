@@ -374,7 +374,8 @@ impl<'b> ODXParser
                         codedvalues:codevalues,
                         dop_ref:dop_ref.map(|n|String::from(n)),
                         physical_constant_value:phys_constant_value.map(|s|s.parse::<u32>().unwrap()),
-                        diag_coded_type:self.__get_diag_coded_type(node)}
+                        diag_coded_type:self.__get_diag_coded_type(node),
+                        variant:Option::None}
        
     }
 
@@ -599,7 +600,7 @@ impl<'b> ODXParser
             {
                 let ident = self.__get_ident(&ele);
                 let mut variant = Variant::default();
-                
+                variant.id = ident;
                 
                 for desdentnode in ele.descendants()
                 {
@@ -607,86 +608,86 @@ impl<'b> ODXParser
                     if desdentnode.tag_name().name() == "FUNCT-CLASS"
                     {
                         let funclass = self.__get_func_class(&desdentnode);
-                        variant.func_classes.insert(variant.id.id.clone(), Box::new(funclass));
+                        variant.func_classes.insert(variant.id.id.clone(), Rc::new(funclass));
                     }
 
                     else if  desdentnode.tag_name().name() == "DTC-DOP"
                     {
                         let dtcdop = self.__get_dtc_dop(&desdentnode);
-                        variant.dtc_object_props.insert(dtcdop.ident.id.clone(), Box::new(dtcdop));
+                        variant.dtc_object_props.insert(dtcdop.ident.id.clone(), Rc::new(dtcdop));
                     }
                     else if  desdentnode.tag_name().name() == "DATA-OBJECT-PROP"
                     {
                         let dataprop = self.__get_data_prop(&desdentnode);
                         println!("{:p}",&dataprop);
                        
-                        variant.data_object_props.insert(dataprop.ident.id.clone(), Box::new(dataprop));
+                        variant.data_object_props.insert(dataprop.ident.id.clone(), Rc::new(dataprop));
                     }
                     else if  desdentnode.tag_name().name() == "ENV-DATA-DESC"
                     {
                         let dataprop = self.__get_env_data_desc(&desdentnode);
-                        variant.env_data_descs.insert(dataprop.ident.id.clone(), Box::new(dataprop));
+                        variant.env_data_descs.insert(dataprop.ident.id.clone(), Rc::new(dataprop));
                     }
                     else if  desdentnode.tag_name().name() == "STRUCTURE"
                     {
                         let mut dataprop = self.__get_struct(&desdentnode);
                         dataprop.variantId = variant.id.id.clone();
-                        variant.structures.insert(dataprop.ident.id.clone(), Box::new(dataprop));
+                        variant.structures.insert(dataprop.ident.id.clone(), Rc::new(dataprop));
                     }
                     else if  desdentnode.tag_name().name() == "STATIC-FIELD"
                     {
                         let mut dataprop = self.__get_static_field(&desdentnode);
                         dataprop.variant_id = variant.id.id.clone();
-                        variant.static_fileds.insert(dataprop.ident.id.clone(), Box::new(dataprop));
+                        variant.static_fileds.insert(dataprop.ident.id.clone(), Rc::new(dataprop));
                     }
                     else if  desdentnode.tag_name().name() == "DYNAMIC_LENGTH_FIELD"
                     {
                         let mut dataprop = self.__get_dynamic_field(&desdentnode);
                         dataprop.variant_id = variant.id.id.clone();
-                        variant.dynamic_fileds.insert(dataprop.ident.id.clone(), Box::new(dataprop));
+                        variant.dynamic_fileds.insert(dataprop.ident.id.clone(), Rc::new(dataprop));
                     }
                     else if  desdentnode.tag_name().name() == "END-OF-PDU-FIELD"
                     {
                         let mut dataprop = self.__get_endofpdu_field(&desdentnode);
                         dataprop.variant_id = variant.id.id.clone();
-                        variant.endofpdu_fileds.insert(dataprop.ident.id.clone(), Box::new(dataprop));
+                        variant.endofpdu_fileds.insert(dataprop.ident.id.clone(), Rc::new(dataprop));
                     }
                     else if  desdentnode.tag_name().name() == "UNIT"
                     {
                         let mut dataprop = self.__get_unit(&desdentnode);
                         
-                        variant.units.insert(dataprop.ident.id.clone(), Box::new(dataprop));
+                        variant.units.insert(dataprop.ident.id.clone(), Rc::new(dataprop));
                     }
 
                     else if  desdentnode.tag_name().name() == "DIAG-SERVICE"
                     {
                         let mut dataprop = self.__get_diag_service(&desdentnode);
                         
-                        variant.diag_comms.insert(dataprop.ident.id.clone(), Box::new(dataprop));
+                        variant.diag_comms.insert(dataprop.ident.id.clone(), Rc::new(dataprop));
                     }
                     else if  desdentnode.tag_name().name() == "REQUEST"
                     {
                         let mut dataprop = self.__get_serive_msg(&desdentnode);
                         
-                        variant.requests.insert(dataprop.ident.id.clone(), Box::new(ServiceMsgType::Request(dataprop)));
+                        variant.requests.insert(dataprop.ident.id.clone(), Rc::new(ServiceMsgType::Request(dataprop)));
                     }
                     else if  desdentnode.tag_name().name() == "POS-RESPONSE"
                     {
                         let mut dataprop = self.__get_serive_msg(&desdentnode);
                         
-                        variant.pos_responses.insert(dataprop.ident.id.clone(), Box::new(ServiceMsgType::Request(dataprop)));
+                        variant.pos_responses.insert(dataprop.ident.id.clone(), Rc::new(ServiceMsgType::Request(dataprop)));
                     }
                     else if  desdentnode.tag_name().name() == "NEG-RESPONSE"
                     {
                         let mut dataprop = self.__get_serive_msg(&desdentnode);
                         
-                        variant.neg_responses.insert(dataprop.ident.id.clone(), Box::new(ServiceMsgType::Request(dataprop)));
+                        variant.neg_responses.insert(dataprop.ident.id.clone(), Rc::new(ServiceMsgType::Request(dataprop)));
                     }
                     else if  desdentnode.tag_name().name() == "COMPARAM-REF"
                     {
                         let mut dataprop = self.__get_comparm_ref(&desdentnode);
                         
-                        variant.comparam_refs.insert(dataprop.ref_id.clone(), Box::new(dataprop));
+                        variant.comparam_refs.insert(dataprop.ref_id.clone(), Rc::new(dataprop));
                     }
                     
 

@@ -29,20 +29,68 @@ lazy_static! {
 mod tests {
     use std::rc::Rc;
 
-    use crate::data_type::Structure;
+    use crate::data_type::{Structure, ServiceMsgType};
 
     use super::*;
 
-
+    #[test]
     fn parsing()
     {
         let odxpath = r"D:\Workspace\RustApp\odxparser\src\CN180S_V1.0.80.odx";
         //let odxpath = r"E:\WORKSPACE\RustApps\odx_parser\src\CN180S_V1.0.80.odx";
         let mut parser = parser::ODXParser::new();
         parser.parse(odxpath);
-        for (key,value) in parser.variants.iter()
+        for (key,variant) in parser.variants.iter()
         {
-         for (k,v) in value.dtc_object_props.iter()
+         
+            for (k,v) in variant.diag_comms.iter()
+            {
+               
+                let request = variant.as_ref().requests.get(k);
+
+                let mut serviceInstance = DiagServiceInstance{..Default::default()};
+
+                if let ServiceMsgType::Request(p)= request.unwrap().as_ref()
+                {   let mut request_instance = ServiceMessageInstance{..Default::default()};
+                    for param in p.params.iter()
+                    {
+                        let param_instance = param.create_data_instance();
+                        request_instance.param_instances.push(param_instance);
+                        
+                    }
+                    serviceInstance.request_instance = request_instance;
+
+                }
+                else if let ServiceMsgType::PositiveResponse(p)= request.unwrap().as_ref()  {
+                    let mut positive_instance = ServiceMessageInstance{..Default::default()};
+                    for param in p.params.iter()
+                    {
+                        let param_instance = param.create_data_instance();
+                        positive_instance.param_instances.push(param_instance);
+                        
+                    }
+                    serviceInstance.positive_response_instance = positive_instance;
+
+                }
+                else if let ServiceMsgType::NegativeReponse(p)= request.unwrap().as_ref()  {
+                    let mut negative_instance = ServiceMessageInstance{..Default::default()};
+                    for param in p.params.iter()
+                    {
+                        let param_instance = param.create_data_instance();
+                        negative_instance.param_instances.push(param_instance);
+                        
+                    }
+                    serviceInstance.positive_response_instance = negative_instance;
+
+                }
+              
+            }
+         
+         
+         
+         
+         
+            for (k,v) in variant.dtc_object_props.iter()
          {
              println!("{}", v.dtcs.len());
              for dtc in &v.dtcs
@@ -51,7 +99,7 @@ mod tests {
  
              }
          }
-         for (k,v) in value.structures.iter()
+         for (k,v) in variant.structures.iter()
          {
              
              println!("{}",v.ident.short_name);
@@ -61,7 +109,7 @@ mod tests {
              }
          }
  
-         for (k,v) in value.data_object_props.iter()
+         for (k,v) in variant.data_object_props.iter()
          {
              let u = v.unit_ref.as_ref();
              match u{
@@ -115,7 +163,6 @@ mod tests {
         //let parent = DataInstanceCore::default();
         let parent_instance:StructureDataInstance=StructureDataInstance{
             instance_core:DataInstanceCore{
-                name:String::from("TestInstance"),
                 ..Default::default()
             },
             ..Default::default()};
@@ -128,16 +175,16 @@ mod tests {
     //let parent2 = parent.clone();
     //println!("{}",Rc::strong_count(&parent2));
 
-      let parent = RefCell::new(&parent_instance as & dyn TDataInstance<Structure>);
+      let parent = RefCell::new(parent_instance);
        
       
       let mut child_instance:StructureDataInstance=StructureDataInstance{
         instance_core:DataInstanceCore{
-            name:String::from(format!("{}{}","ChildInstance",1)),
+            
             ..Default::default()
             },
             ..Default::default()};
-            child_instance.set_parent(&parent);
+            child_instance.set_parent(Rc::new(parent));
 
             let currnetparent = child_instance.get_parent();
             

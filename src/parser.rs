@@ -1,7 +1,5 @@
 use std::collections::HashMap;
-use std::process::id;
-use std::rc::Weak;
-use std::rc::Rc;
+use std::sync::Arc;
 use roxmltree::Document;
 use roxmltree::Node;
 use crate::data_instance;
@@ -25,7 +23,8 @@ pub struct DiagService
 
 pub struct ODXParser
 {
-    pub variants:HashMap<String, Rc<Variant>>,
+    pub variants:HashMap<String, Arc<Variant>>,
+    pub current_variant_name:String,
     odxfile:String
 
 }
@@ -33,7 +32,7 @@ impl<'b> ODXParser
 {
     pub fn new()->ODXParser
     {
-        return ODXParser{variants:HashMap::new(),odxfile:String::new()}
+        return ODXParser{variants:HashMap::new(),odxfile:String::new(),current_variant_name:String::default()}
     }
     pub fn parse(&mut self,odxfile:&str)->bool
     {
@@ -123,7 +122,7 @@ impl<'b> ODXParser
     }
 
     /// get diag coded type from the parent node, return the option 
-    pub fn __get_diag_coded_type(&mut self,diagcodetypeParent:&Node)->Option<DiagCodedType>
+    pub fn __get_diag_coded_type(&mut self,diagcodetypeParent:&Node)->Option<Arc<DiagCodedType>>
     {
 
         let result = match diagcodetypeParent.descendants().find(|n|n.tag_name().name() == "DIAG-CODED-TYPE")
@@ -133,12 +132,13 @@ impl<'b> ODXParser
                 let basedatatype = diagcodetype.attribute("BASE-DATA-TYPE");
                 let ishighlow = diagcodetype.attribute("IS-HIGHLOW-BYTE-ORDER").map(|ishighlow|ishighlow=="false");
                 let bitlength = self.__get_descendantText(&diagcodetype,"BIT-LENGTH").map(|bitlength|bitlength.parse::<u32>().unwrap());
-                DiagCodedType {
+                
+                Arc::new(DiagCodedType {
                    aa_type:aatype.map(|n|String::from(n)),
                    base_type:basedatatype.map(|n|String::from(n)),
                    ishighbyteorder:ishighlow,
                    bit_length:bitlength  
-                }
+                })
             }),
             _=>None
         };
@@ -244,7 +244,7 @@ impl<'b> ODXParser
             unit_ref:unit_ref
         };
         
-        println!("{:p}",&dop);
+        //println!("{:p}",&dop);
         return dop
     }
 
@@ -320,7 +320,8 @@ impl<'b> ODXParser
         {
             if paramnode.tag_name().name() == "PARAM"
             {
-            let param = self.__get_param(&paramnode);
+            let mut param = self.__get_param(&paramnode);
+            param.variant_id = self.current_variant_name.clone();
             params.push(param);
             }
         }
@@ -374,7 +375,7 @@ impl<'b> ODXParser
                         codedvalues:codevalues,
                         dop_ref:dop_ref.map(|n|String::from(n)),
                         physical_constant_value:phys_constant_value.map(|s|s.parse::<u32>().unwrap()),
-                        diag_coded_type:self.__get_diag_coded_type(node),
+                        diag_coded_type:(self.__get_diag_coded_type(node)),
                         variant:Option::None}
        
     }
@@ -394,7 +395,8 @@ impl<'b> ODXParser
         {
            if ele.tag_name().name() == "PARAM"
            {
-            let param = self.__get_param(&ele);
+            let mut param = self.__get_param(&ele);
+            param.variant_id = self.current_variant_name.clone();
             struct_obj.params.push(Box::new(param));
 
            }
@@ -558,7 +560,8 @@ impl<'b> ODXParser
         {
            if ele.tag_name().name() == "PARAM"
            {
-            let param = self.__get_param(&ele);
+            let mut param = self.__get_param(&ele);
+            param.variant_id = self.current_variant_name.clone();
             params.push(param);
 
            }
@@ -580,11 +583,7 @@ impl<'b> ODXParser
             value = self.__get_descendantText(node, "SIMPLE-VALUE").map(|s|String::from(s));
         }
         ComParam { ref_id: id_ref, doc_type: doc_type, doc_ref:doc_ref,value: value }
-    
-    
-        
-    
-    
+
     }
 
 
@@ -600,99 +599,99 @@ impl<'b> ODXParser
             {
                 let ident = self.__get_ident(&ele);
                 let mut variant = Variant::default();
+                self.current_variant_name = ident.short_name.clone();
                 variant.id = ident;
-                
                 for desdentnode in ele.descendants()
                 {
-                    println!("{}",desdentnode.tag_name().name());
+                    //println!("{}",desdentnode.tag_name().name());
                     if desdentnode.tag_name().name() == "FUNCT-CLASS"
                     {
                         let funclass = self.__get_func_class(&desdentnode);
-                        variant.func_classes.insert(variant.id.id.clone(), Rc::new(funclass));
+                        variant.func_classes.insert(variant.id.id.clone(), Arc::new(funclass));
                     }
 
                     else if  desdentnode.tag_name().name() == "DTC-DOP"
                     {
                         let dtcdop = self.__get_dtc_dop(&desdentnode);
-                        variant.dtc_object_props.insert(dtcdop.ident.id.clone(), Rc::new(dtcdop));
+                        variant.dtc_object_props.insert(dtcdop.ident.id.clone(), Arc::new(dtcdop));
                     }
                     else if  desdentnode.tag_name().name() == "DATA-OBJECT-PROP"
                     {
                         let dataprop = self.__get_data_prop(&desdentnode);
-                        println!("{:p}",&dataprop);
+                        //println!("{:p}",&dataprop);
                        
-                        variant.data_object_props.insert(dataprop.ident.id.clone(), Rc::new(dataprop));
+                        variant.data_object_props.insert(dataprop.ident.id.clone(), Arc::new(dataprop));
                     }
                     else if  desdentnode.tag_name().name() == "ENV-DATA-DESC"
                     {
                         let dataprop = self.__get_env_data_desc(&desdentnode);
-                        variant.env_data_descs.insert(dataprop.ident.id.clone(), Rc::new(dataprop));
+                        variant.env_data_descs.insert(dataprop.ident.id.clone(), Arc::new(dataprop));
                     }
                     else if  desdentnode.tag_name().name() == "STRUCTURE"
                     {
                         let mut dataprop = self.__get_struct(&desdentnode);
                         dataprop.variantId = variant.id.id.clone();
-                        variant.structures.insert(dataprop.ident.id.clone(), Rc::new(dataprop));
+                        variant.structures.insert(dataprop.ident.id.clone(), Arc::new(dataprop));
                     }
                     else if  desdentnode.tag_name().name() == "STATIC-FIELD"
                     {
                         let mut dataprop = self.__get_static_field(&desdentnode);
                         dataprop.variant_id = variant.id.id.clone();
-                        variant.static_fileds.insert(dataprop.ident.id.clone(), Rc::new(dataprop));
+                        variant.static_fileds.insert(dataprop.ident.id.clone(), Arc::new(dataprop));
                     }
                     else if  desdentnode.tag_name().name() == "DYNAMIC_LENGTH_FIELD"
                     {
                         let mut dataprop = self.__get_dynamic_field(&desdentnode);
                         dataprop.variant_id = variant.id.id.clone();
-                        variant.dynamic_fileds.insert(dataprop.ident.id.clone(), Rc::new(dataprop));
+                        variant.dynamic_fileds.insert(dataprop.ident.id.clone(), Arc::new(dataprop));
                     }
                     else if  desdentnode.tag_name().name() == "END-OF-PDU-FIELD"
                     {
                         let mut dataprop = self.__get_endofpdu_field(&desdentnode);
                         dataprop.variant_id = variant.id.id.clone();
-                        variant.endofpdu_fileds.insert(dataprop.ident.id.clone(), Rc::new(dataprop));
+                        variant.endofpdu_fileds.insert(dataprop.ident.id.clone(), Arc::new(dataprop));
                     }
                     else if  desdentnode.tag_name().name() == "UNIT"
                     {
                         let mut dataprop = self.__get_unit(&desdentnode);
                         
-                        variant.units.insert(dataprop.ident.id.clone(), Rc::new(dataprop));
+                        variant.units.insert(dataprop.ident.id.clone(), Arc::new(dataprop));
                     }
 
                     else if  desdentnode.tag_name().name() == "DIAG-SERVICE"
                     {
                         let mut dataprop = self.__get_diag_service(&desdentnode);
                         
-                        variant.diag_comms.insert(dataprop.ident.id.clone(), Rc::new(dataprop));
+                        variant.diag_comms.insert(dataprop.ident.id.clone(), Arc::new(dataprop));
                     }
                     else if  desdentnode.tag_name().name() == "REQUEST"
                     {
                         let mut dataprop = self.__get_serive_msg(&desdentnode);
                         
-                        variant.requests.insert(dataprop.ident.id.clone(), Rc::new(ServiceMsgType::Request(dataprop)));
+                        variant.requests.insert(dataprop.ident.id.clone(), Arc::new(ServiceMsgType::Request(dataprop)));
                     }
                     else if  desdentnode.tag_name().name() == "POS-RESPONSE"
                     {
                         let mut dataprop = self.__get_serive_msg(&desdentnode);
                         
-                        variant.pos_responses.insert(dataprop.ident.id.clone(), Rc::new(ServiceMsgType::Request(dataprop)));
+                        variant.pos_responses.insert(dataprop.ident.id.clone(), Arc::new(ServiceMsgType::Request(dataprop)));
                     }
                     else if  desdentnode.tag_name().name() == "NEG-RESPONSE"
                     {
                         let mut dataprop = self.__get_serive_msg(&desdentnode);
                         
-                        variant.neg_responses.insert(dataprop.ident.id.clone(), Rc::new(ServiceMsgType::Request(dataprop)));
+                        variant.neg_responses.insert(dataprop.ident.id.clone(), Arc::new(ServiceMsgType::Request(dataprop)));
                     }
                     else if  desdentnode.tag_name().name() == "COMPARAM-REF"
                     {
                         let mut dataprop = self.__get_comparm_ref(&desdentnode);
                         
-                        variant.comparam_refs.insert(dataprop.ref_id.clone(), Rc::new(dataprop));
+                        variant.comparam_refs.insert(dataprop.ref_id.clone(), Arc::new(dataprop));
                     }
                     
 
                 }
-                self.variants.insert(variant.id.id.clone(), Rc::new(variant));
+                self.variants.insert(variant.id.id.clone(), Arc::new(variant));
         
                 
             }

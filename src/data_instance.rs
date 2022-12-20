@@ -1,5 +1,5 @@
 
-use std::{rc::{Rc, Weak}, any::Any, borrow::Borrow};
+use std::sync::Arc;
 use std::cell::RefCell;
 use bitvec::prelude::*;
 use crate::data_type::{ComputeMethod,InternalConstrain, DiagCodedType, DataObjectProp, Structure, DynamicLengthField,Mux,EndOfPDUField, EnvDataDesc};
@@ -40,8 +40,8 @@ pub trait TDataInstance
 
     }
 
-    fn get_parent(&self)->&Option<Rc<RefCell<dyn TDataInstance >>>;
-    fn set_parent(&mut self,parent:Rc<RefCell<dyn TDataInstance>>);
+    fn get_parent(&self)->&Option<Arc<RefCell<dyn TDataInstance >>>;
+    fn set_parent(&mut self,parent:Arc<RefCell<dyn TDataInstance>>);
 
 }
 
@@ -51,9 +51,9 @@ pub struct DataInstanceCore<T>
 {
     
     pub byte_postiion:u32,
-    pub parent:Option<Rc<RefCell<dyn TDataInstance>>>,
+    pub parent:Option<Arc<RefCell<dyn TDataInstance>>>,
     pub bit_position:u32,
-    pub datatype:Rc<T>,
+    pub datatype:Arc<T>,
     // for request data only
     pub pending_value:Option<Vec<u8>>,
     pub nominal_value:Option<Vec<u8>>,
@@ -61,11 +61,27 @@ pub struct DataInstanceCore<T>
     pub current_value:Option<Vec<u8>>,
 }
 
+#[derive(Default)]
 pub struct CodedDataDataInstance
 {
     pub instance_core:DataInstanceCore<DiagCodedType>,
-    pub coded_value:u64,
-    pub bit_length:u32
+}
+
+
+impl TDataInstance for CodedDataDataInstance
+{
+    fn get_parent(&self)->&Option<Arc<RefCell<dyn TDataInstance >>>
+    {
+        return &self.instance_core.parent;
+    }
+
+    fn set_parent(&mut self,parent:Arc<RefCell<dyn TDataInstance>>)
+    {
+       
+       self.instance_core.parent = Some(parent);
+    }
+    
+   
 }
 
 #[derive(Default)]
@@ -76,12 +92,12 @@ pub struct DataObjectPropDataInstance
 
 impl TDataInstance for DataObjectPropDataInstance
 {
-    fn get_parent(&self)->&Option<Rc<RefCell<dyn TDataInstance >>>
+    fn get_parent(&self)->&Option<Arc<RefCell<dyn TDataInstance >>>
     {
         return &self.instance_core.parent;
     }
 
-    fn set_parent(&mut self,parent:Rc<RefCell<dyn TDataInstance>>)
+    fn set_parent(&mut self,parent:Arc<RefCell<dyn TDataInstance>>)
     {
        
        self.instance_core.parent = Some(parent);
@@ -99,12 +115,12 @@ pub struct StaticFieldInstance
 
 impl TDataInstance for StaticFieldInstance
 {
-    fn get_parent(&self)->&Option<Rc<RefCell<dyn TDataInstance >>>
+    fn get_parent(&self)->&Option<Arc<RefCell<dyn TDataInstance >>>
     {
         return &self.instance_core.parent;
     }
 
-    fn set_parent(&mut self,parent:Rc<RefCell<dyn TDataInstance>>)
+    fn set_parent(&mut self,parent:Arc<RefCell<dyn TDataInstance>>)
     {
        
        self.instance_core.parent = Some(parent);
@@ -131,12 +147,12 @@ pub struct DynamicLengthFieldInstance
 
 impl TDataInstance for DynamicLengthFieldInstance
 {
-    fn get_parent(&self)->&Option<Rc<RefCell<dyn TDataInstance >>>
+    fn get_parent(&self)->&Option<Arc<RefCell<dyn TDataInstance >>>
     {
         return &self.instance_core.parent;
     }
 
-    fn set_parent(&mut self,parent:Rc<RefCell<dyn TDataInstance>>)
+    fn set_parent(&mut self,parent:Arc<RefCell<dyn TDataInstance>>)
     {
        
        self.instance_core.parent = Some(parent);
@@ -151,12 +167,12 @@ pub struct MuxInstance
 
 impl TDataInstance for MuxInstance
 {
-    fn get_parent(&self)->&Option<Rc<RefCell<dyn TDataInstance >>>
+    fn get_parent(&self)->&Option<Arc<RefCell<dyn TDataInstance >>>
     {
         return &self.instance_core.parent;
     }
 
-    fn set_parent(&mut self,parent:Rc<RefCell<dyn TDataInstance>>)
+    fn set_parent(&mut self,parent:Arc<RefCell<dyn TDataInstance>>)
     {
        
        self.instance_core.parent = Some(parent);
@@ -172,12 +188,12 @@ pub struct EndOfPDUFieldInstance
 
 impl TDataInstance for EndOfPDUFieldInstance
 {
-    fn get_parent(&self)->&Option<Rc<RefCell<dyn TDataInstance >>>
+    fn get_parent(&self)->&Option<Arc<RefCell<dyn TDataInstance >>>
     {
         return &self.instance_core.parent;
     }
 
-    fn set_parent(&mut self,parent:Rc<RefCell<dyn TDataInstance>>)
+    fn set_parent(&mut self,parent:Arc<RefCell<dyn TDataInstance>>)
     {
        
        self.instance_core.parent = Some(parent);
@@ -194,12 +210,12 @@ pub struct EnvDataDescInstance
 
 impl TDataInstance for EnvDataDescInstance
 {
-    fn get_parent(&self)->&Option<Rc<RefCell<dyn TDataInstance >>>
+    fn get_parent(&self)->&Option<Arc<RefCell<dyn TDataInstance >>>
     {
         return &self.instance_core.parent;
     }
 
-    fn set_parent(&mut self,parent:Rc<RefCell<dyn TDataInstance>>)
+    fn set_parent(&mut self,parent:Arc<RefCell<dyn TDataInstance>>)
     {
        
        self.instance_core.parent = Some(parent);
@@ -217,7 +233,7 @@ impl TDataInstance for EnvDataDescInstance
 
 #[derive(Default)]
 pub struct ServiceMessageInstance{
-    pub param_instances:Vec<Rc<RefCell<dyn TDataInstance>>>
+    pub param_instances:Vec<Arc<RefCell<dyn TDataInstance>>>
 }
 
 
@@ -230,7 +246,7 @@ pub struct ServiceMessageInstance{
 pub struct StructureDataInstance
 {
     pub instance_core:DataInstanceCore<Structure>,
-    pub children_instances:Vec<Rc<RefCell<dyn TDataInstance>>>
+    pub children_instances:Vec<Arc<RefCell<dyn TDataInstance>>>
     
 }
 
@@ -241,12 +257,12 @@ impl StructureDataInstance
 
 impl TDataInstance for StructureDataInstance
 {
-    fn get_parent(&self)->&Option<Rc<RefCell<dyn TDataInstance >>>
+    fn get_parent(&self)->&Option<Arc<RefCell<dyn TDataInstance >>>
     {
         return &self.instance_core.parent;
     }
 
-    fn set_parent(&mut self,parent:Rc<RefCell<dyn TDataInstance>>)
+    fn set_parent(&mut self,parent:Arc<RefCell<dyn TDataInstance>>)
     {
        
        self.instance_core.parent = Some(parent);

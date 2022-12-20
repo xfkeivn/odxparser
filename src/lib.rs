@@ -2,7 +2,10 @@ extern crate bv;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::cell::RefCell;
-
+use std::sync::Arc;
+use data_type::Variant;
+use std::sync::Mutex;
+use parser::ODXParser;
 pub fn add(left: usize, right: usize) -> usize {
     left + right
 }
@@ -12,17 +15,10 @@ pub mod data_instance;
 pub mod data_type;
 use data_instance::*;
 
-
 lazy_static! {
-    pub static ref MAP:HashMap<u32,&'static str> ={
-        let mut m = HashMap::new();
-        m.insert(0,"foo");
-        m
-    };
+
+    static ref MAP: HashMap<String,Variant> = HashMap::new();
 }
-
-
-
 
 
 #[cfg(test)]
@@ -36,16 +32,15 @@ mod tests {
     #[test]
     fn parsing()
     {
-        //let odxpath = r"D:\Workspace\RustApp\odxparser\src\CN180S_V1.0.80.odx";
-        let odxpath = r"E:\WORKSPACE\RustApps\odx_parser\src\CN180S_V1.0.80.odx";
+        let odxpath = r"D:\Workspace\RustApp\odxparser\src\CN180S_V1.0.80.odx";
+        
+        //let odxpath = r"E:\WORKSPACE\RustApps\odx_parser\src\CN180S_V1.0.80.odx";
         let mut parser = parser::ODXParser::new();
         parser.parse(odxpath);
         for (key,variant) in parser.variants.iter()
         {
-         
             for (k,v) in variant.diag_comms.iter()
-            {
-               
+            { 
                 let diag_service = variant.as_ref().diag_comms.get(k);
 
                 let mut serviceInstance = DiagServiceInstance{..Default::default()};
@@ -56,8 +51,8 @@ mod tests {
                     {
                         let mut request_instance = ServiceMessageInstance{..Default::default()};
 
-                    for param in p2.params.iter()
-                    {
+                    for mut param in p2.params.iter()
+                    {   
                         let param_instance = param.create_data_instance();
                         request_instance.param_instances.push(param_instance);
                         
@@ -211,7 +206,7 @@ mod tests {
             ..Default::default()
             },
             ..Default::default()};
-            child_instance.set_parent(Rc::new(parent));
+            child_instance.set_parent(Arc::new(parent));
 
             let currnetparent = child_instance.get_parent();
             

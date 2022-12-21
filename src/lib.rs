@@ -6,24 +6,19 @@ use std::sync::Arc;
 use data_type::Variant;
 use std::sync::Mutex;
 use parser::ODXParser;
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+
 
 pub mod parser;
 pub mod data_instance;
 pub mod data_type;
 use data_instance::*;
 
-lazy_static! {
 
-    static ref MAP: HashMap<String,Variant> = HashMap::new();
-}
 
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
+    use std::{rc::Rc, borrow::Borrow};
 
     use crate::data_type::{Structure, ServiceMsgType};
 
@@ -39,21 +34,21 @@ mod tests {
         parser.parse(odxpath);
         for (key,variant) in parser.variants.iter()
         {
-            for (k,v) in variant.diag_comms.iter()
+            for (k,v) in variant.borrow().diag_comms.iter()
             { 
-                let diag_service = variant.as_ref().diag_comms.get(k);
+                let diag_service = variant.borrow().diag_comms.get(k);
 
                 let mut serviceInstance = DiagServiceInstance{..Default::default()};
 
-                if let Some(p)= variant.as_ref().requests.get(&diag_service.unwrap().request_ref)
+                if let Some(p)= variant.borrow().requests.get(&diag_service.unwrap().borrow().request_ref)
                 {   
-                    if let ServiceMsgType::Request(p2) = p.as_ref()
+                    if let ServiceMsgType::Request(p2) = *p.borrow()
                     {
                         let mut request_instance = ServiceMessageInstance{..Default::default()};
 
                     for mut param in p2.params.iter()
                     {   
-                        let param_instance = param.create_data_instance();
+                        let param_instance = param.create_data_instance(Some(variant.clone()));
                         request_instance.param_instances.push(param_instance);
                         
                     }
@@ -63,17 +58,17 @@ mod tests {
                     
 
                 }
-                if diag_service.unwrap().pos_response_ref.is_some()
+                if diag_service.unwrap().borrow().pos_response_ref.is_some()
                 {
-                    if let Some(p)= variant.as_ref().pos_responses.get(diag_service.unwrap().pos_response_ref.as_ref().unwrap())
+                    if let Some(p)= variant.borrow().pos_responses.get(diag_service.unwrap().borrow().pos_response_ref.unwrap().as_ref())
                     {   
-                        if let ServiceMsgType::PositiveResponse(p2) = p.as_ref()
+                        if let ServiceMsgType::PositiveResponse(p2) = *p.borrow()
                         {
                             let mut response_instance = ServiceMessageInstance{..Default::default()};
     
                         for param in p2.params.iter()
                         {
-                            let param_instance = param.create_data_instance();
+                            let param_instance = param.create_data_instance(Some(variant.clone()));
                             response_instance.param_instances.push(param_instance);
                             
                         }
@@ -84,17 +79,17 @@ mod tests {
     
                     }
                 }
-                if diag_service.unwrap().neg_response_ref.is_some()
+                if diag_service.unwrap().borrow().neg_response_ref.is_some()
                 {
-                    if let Some(p)= variant.as_ref().neg_responses.get(diag_service.unwrap().neg_response_ref.as_ref().unwrap())
+                    if let Some(p)= variant.borrow().neg_responses.get(diag_service.unwrap().borrow().neg_response_ref.unwrap().as_ref())
                     {   
-                        if let ServiceMsgType::NegativeReponse(p2) = p.as_ref()
+                        if let ServiceMsgType::NegativeReponse(p2) = *p.borrow()
                         {
                             let mut neg_response_instance = ServiceMessageInstance{..Default::default()};
     
                         for param in p2.params.iter()
                         {
-                            let param_instance = param.create_data_instance();
+                            let param_instance = param.create_data_instance(Some(variant.clone()));
                             neg_response_instance.param_instances.push(param_instance);
                             
                         }
@@ -110,38 +105,7 @@ mod tests {
          
          
          
-         
-         
-            for (k,v) in variant.dtc_object_props.iter()
-         {
-             println!("{}", v.dtcs.len());
-             for dtc in &v.dtcs
-             {
-                 println!("      {}",dtc.display_trouble_code);
- 
-             }
-         }
-         for (k,v) in variant.structures.iter()
-         {
-             
-             println!("{}",v.ident.short_name);
-             for param in v.params.iter()
-             {
-                 println!("       {}",param.shortname);
-             }
-         }
- 
-         for (k,v) in variant.data_object_props.iter()
-         {
-             let u = v.unit_ref.as_ref();
-             match u{
-                 Some(u)=>println!("{}",u),
-                 _=>{}
-             }
- 
- 
-             
-         }
+
         }
 
     }

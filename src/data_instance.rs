@@ -2,7 +2,7 @@
 use std::sync::Arc;
 use std::cell::RefCell;
 use bitvec::prelude::*;
-use crate::data_type::{ComputeMethod,InternalConstrain, DiagCodedType, DataObjectProp, Structure, DynamicLengthField,Mux,EndOfPDUField, EnvDataDesc};
+use crate::data_type::{ComputeMethod,InternalConstrain, DiagCodedType, DataObjectProp, Structure, DynamicLengthField,Mux,EndOfPDUField, EnvDataDesc, StaticField};
 
 pub trait TDataInstance
 {
@@ -53,7 +53,7 @@ pub struct DataInstanceCore<T>
     pub byte_postiion:u32,
     pub parent:Option<Arc<RefCell<dyn TDataInstance>>>,
     pub bit_position:u32,
-    pub datatype:Arc<T>,
+    pub datatype:Arc<RefCell<T>>,
     // for request data only
     pub pending_value:Option<Vec<u8>>,
     pub nominal_value:Option<Vec<u8>>,
@@ -109,7 +109,7 @@ impl TDataInstance for DataObjectPropDataInstance
 
 pub struct StaticFieldInstance
 { 
-    pub instance_core:DataInstanceCore<DataObjectProp>,
+    pub instance_core:DataInstanceCore<StaticField>,
 
 }
 
@@ -277,11 +277,11 @@ impl TDataInstance for StructureDataInstance
         {
         Some(p)=>{
           
-            full_name = format!("{}.{}",p.try_borrow().unwrap().get_full_name(),self.instance_core.datatype.ident.short_name.as_str());
+            full_name = format!("{}.{}",p.try_borrow().unwrap().get_full_name(),self.instance_core.datatype.borrow().ident.short_name.as_str());
             
         },
         _=>{
-         full_name = self.instance_core.datatype.ident.short_name.clone();
+         full_name = self.instance_core.datatype.borrow().ident.short_name.clone();
         }
         }
         return full_name;

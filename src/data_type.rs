@@ -1,22 +1,22 @@
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::sync::{Arc};
 use crate::data_instance::*;
-use std::cell::{RefCell};
+use std::cell::{RefCell, Ref};
 pub trait DataType{
-    type I;
-    fn create_data_instance(self: Arc<Self>,name:&str,byte_postion:u32,bit_position:u32)->Arc<RefCell<Self::I>>;
     fn is_high_low_byte_order(&self)->bool
     {return false;}
 
 }
 
 
-#[derive(Debug,PartialEq)]
+#[derive(Debug)]
 #[derive(Default)]
 pub struct Identity
 {
     pub short_name:String,
     pub long_name:Option<String>,
+    pub variant:Option<Arc<RefCell<Variant>>>,
     pub id:String
 }
 
@@ -29,24 +29,24 @@ pub trait ComputeMethod {
     }
 }
 
-#[derive(Default)]
+#[derive(Default,Debug)]
 pub struct  Variant
 {
     pub id:Identity,
-    pub dtc_object_props:HashMap<String,Arc<DTCDOP>>,
-    pub data_object_props:HashMap<String,Arc<DataObjectProp>>,
-    pub env_data_descs:HashMap<String,Arc<EnvDataDesc>>,
-    pub structures:HashMap<String,Arc<Structure>>,
-    pub static_fileds:HashMap<String,Arc<StaticField>>,
-    pub dynamic_fileds:HashMap<String,Arc<DynamicLengthField>>,
-    pub endofpdu_fileds:HashMap<String,Arc<EndOfPDUField>>,
-    pub units:HashMap<String,Arc<Unit>>,
-    pub diag_comms:HashMap<String,Arc<DiagSerivce>>,
-    pub requests:HashMap<String,Arc<ServiceMsgType>>,
-    pub pos_responses:HashMap<String,Arc<ServiceMsgType>>,
-    pub neg_responses:HashMap<String,Arc<ServiceMsgType>>,
-    pub comparam_refs:HashMap<String,Arc<ComParam>>,     
-    pub func_classes:HashMap<String,Arc<FunctionClass>>,
+    pub dtc_object_props:HashMap<String,Arc<RefCell<DTCDOP>>>,
+    pub data_object_props:HashMap<String,Arc<RefCell<DataObjectProp>>>,
+    pub env_data_descs:HashMap<String,Arc<RefCell<EnvDataDesc>>>,
+    pub structures:HashMap<String,Arc<RefCell<Structure>>>,
+    pub static_fileds:HashMap<String,Arc<RefCell<StaticField>>>,
+    pub dynamic_fileds:HashMap<String,Arc<RefCell<DynamicLengthField>>>,
+    pub endofpdu_fileds:HashMap<String,Arc<RefCell<EndOfPDUField>>>,
+    pub units:HashMap<String,Arc<RefCell<Unit>>>,
+    pub diag_comms:HashMap<String,Arc<RefCell<DiagSerivce>>>,
+    pub requests:HashMap<String,Arc<RefCell<ServiceMsgType>>>,
+    pub pos_responses:HashMap<String,Arc<RefCell<ServiceMsgType>>>,
+    pub neg_responses:HashMap<String,Arc<RefCell<ServiceMsgType>>>,
+    pub comparam_refs:HashMap<String,Arc<RefCell<ComParam>>>,     
+    pub func_classes:HashMap<String,Arc<RefCell<FunctionClass>>>,
 }
 
 
@@ -75,7 +75,7 @@ pub struct Unit
     pub ident:Identity,
     pub display_name:String
 }
-
+#[derive(Default,Debug)]
 pub struct Param
 {
     pub shortname:String,
@@ -89,57 +89,53 @@ pub struct Param
     pub aa_type:Option<String>,
     pub variant_id:String,
     pub physical_constant_value:Option<u32>,
-    pub diag_coded_type:Option<Arc<DiagCodedType>>,
-    pub variant:Option<Arc<Variant>>
+    pub diag_coded_type:Option<Arc<RefCell<DiagCodedType>>>,
+    pub variant:Option<Arc<RefCell<Variant>>>
 }
 
 impl Param {
     
-    pub fn create_data_instance(&self,)->Arc<RefCell<dyn TDataInstance>>
+    pub fn create_data_instance(& self,variant:Option<Arc<RefCell<Variant>>>)->Arc<RefCell<dyn TDataInstance>>
     {
         let name = &self.shortname;
         let byte_position = self.byte_position.unwrap();
         let bit_position = self.bit_position.unwrap_or(0);
-
-
-
         if self.dop_ref.is_none()
         {
             if let Some(p) = &self.diag_coded_type
             {
-                return p.clone().create_data_instance(name, byte_position, bit_position)
+
+                return DiagCodedType::create_instance(p.clone(), name, byte_position, bit_position)
             }
             else {
                 panic!("The ref is None and it is not diag coded type is not invalid mode");
             }
         }
-        if self.variant.is_none()
+
+        else if let Some(p) = self.variant.as_ref().unwrap().borrow().data_object_props.get(self.dop_ref.as_ref().unwrap())
         {
-               
-                panic!("The ref is None and it is not diag coded type is not invalid mode");
+           DataObjectProp::create_instance(p.clone(), name, byte_position, bit_position)
+           
+        }
+        else if let Some(p) =self.variant.as_ref().unwrap().borrow().structures.get(self.dop_ref.as_ref().unwrap())
+        {
+            Structure::create_instance(p.clone(), name, byte_position, bit_position)
             
         }
-
-        else if let Some(p) = self.variant.as_ref().unwrap().data_object_props.get(self.dop_ref.as_ref().unwrap())
+        else if let Some(p) =self.variant.as_ref().unwrap().borrow().static_fileds.get(self.dop_ref.as_ref().unwrap())
         {
-           p.clone().create_data_instance(name, byte_position, bit_position)
-        }
-        else if let Some(p) =self.variant.as_ref().unwrap().structures.get(self.dop_ref.as_ref().unwrap())
-        {
-            p.clone().create_data_instance(name, byte_position, bit_position)
-        }
-        else if let Some(p) =self.variant.as_ref().unwrap().static_fileds.get(self.dop_ref.as_ref().unwrap())
-        {
-            p.clone().create_data_instance(name, byte_position, bit_position)
+            StaticField::create_instance(p.clone(), name, byte_position, bit_position)
+            
         }
       
-        else if let Some(p) =self.variant.as_ref().unwrap().env_data_descs.get(self.dop_ref.as_ref().unwrap())
+        else if let Some(p) =self.variant.as_ref().unwrap().borrow().env_data_descs.get(self.dop_ref.as_ref().unwrap())
         {
-            p.clone().create_data_instance(name, byte_position, bit_position)
+            EnvDataDesc::create_instance(p.clone(), name, bit_position, bit_position)
+      
         }
-        else if let Some(p) =self.variant.as_ref().unwrap().static_fileds.get(self.dop_ref.as_ref().unwrap())
+        else if let Some(p) =self.variant.as_ref().unwrap().borrow().dynamic_fileds.get(self.dop_ref.as_ref().unwrap())
         {
-            p.clone().create_data_instance(name, byte_position, bit_position)
+            DynamicLengthField::create_instance(p.clone(), name, bit_position, bit_position)
         }
         else {
             panic!("")
@@ -182,18 +178,17 @@ pub struct DiagCodedType
 
 impl DataType for DiagCodedType
 {
-    type I = CodedDataDataInstance;
-    fn create_data_instance(self: Arc<Self>,name:&str,byte_postion:u32,bit_position:u32)->Arc<RefCell<Self::I>>
+}
+impl DiagCodedType {
+    fn create_instance(datatype:Arc<RefCell<DiagCodedType>>,name:&str,byte_postion:u32,bit_position:u32)->Arc<RefCell<CodedDataDataInstance>>
     {
-       let di =  CodedDataDataInstance{
-            instance_core:DataInstanceCore{datatype:self.clone() ,..Default::default()},
+        let di =  CodedDataDataInstance{
+            instance_core:DataInstanceCore{datatype:datatype ,..Default::default()},
         };
         return Arc::new(RefCell::new(di));
 
     }
-
 }
-
 
 
 
@@ -216,12 +211,19 @@ pub struct ComParam
     pub value:Option<String>,
 }
 
+impl Debug for dyn ComputeMethod {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "ComputeMethod");
+        Result::Ok(())
+    }
+}
 
-#[derive(Default)]
+
+#[derive(Default,Debug)]
 pub struct DataObjectProp
 {
     pub physical_type:Option<PhysicalType>,
-    pub diag_coded_type:Option<Arc<DiagCodedType>>,
+    pub diag_coded_type:Option<Arc<RefCell<DiagCodedType>>>,
     pub ident:Identity,
     pub compute_method:Option<Box<dyn ComputeMethod>>,
     pub unit_ref:Option<String>,
@@ -236,56 +238,61 @@ impl DataObjectProp {
 
 impl DataType for DataObjectProp
 {
-    type I = DataObjectPropDataInstance;
-    fn create_data_instance(self: Arc<Self>,name:&str,byte_postion:u32,bit_position:u32)->Arc<RefCell<Self::I>>
+
+}
+
+impl DataObjectProp {
+    fn create_instance(datatype:Arc<RefCell<DataObjectProp>>,name:&str,byte_postion:u32,bit_position:u32)->Arc<RefCell<DataObjectPropDataInstance>>
     {
-       let di =  DataObjectPropDataInstance{
-            instance_core:DataInstanceCore{datatype:self.clone() ,..Default::default()},
+        let di =  DataObjectPropDataInstance{
+            instance_core:DataInstanceCore{datatype:datatype ,..Default::default()},
         };
         return Arc::new(RefCell::new(di));
 
     }
-
 }
 
 
-#[derive(Default)]
+
+#[derive(Default,Debug)]
 pub struct Structure
 {
 
     pub params:Vec<Box<Param>>,
     pub ident:Identity,
     pub bytesize:Option<u32>,
-    ///Weak 可以用来解决循环引用赵成的内存如法释放，Variant拥有struct，struct又有variant，可能会照成循环引用
-    pub variantId:String
+    
    
 }
 
 impl DataType for Structure {
-    type I = StructureDataInstance;
-    fn create_data_instance(self: Arc<Self>,name:&str,byte_postion:u32,bit_position:u32)->Arc<RefCell<Self::I>>
+   
+}
+
+impl Structure {
+    fn create_instance(datatype:Arc<RefCell<Structure>>,name:&str,byte_postion:u32,bit_position:u32)->Arc<RefCell<StructureDataInstance>>
     {
-        let di = Arc::new(RefCell::new(StructureDataInstance{..Default::default()}));
-        
-        for param in self.params.iter()
+        let mut di =  Arc::new(RefCell::new(StructureDataInstance{
+            instance_core:DataInstanceCore{datatype:datatype.clone() ,..Default::default()},
+            ..Default::default()
+        }));
+
+        for param in datatype.borrow_mut().params.iter()
         {   
-            let mut child = param.create_data_instance();
+            let mut child = param.create_data_instance(datatype.borrow_mut().ident.variant.clone());
+            
             child.borrow_mut().set_parent(di.clone());
             di.borrow_mut().children_instances.push(child);
             
-           
-
         }
+        return di
 
-        return di;
-        
     }
-    
 }
 
 
 
-#[derive(Default)]
+#[derive(Default,Debug)]
 pub struct EnvDataDesc{
     pub ident:Identity,
     pub param_snref:Option<String>,
@@ -295,30 +302,28 @@ pub struct EnvDataDesc{
 
 impl DataType for EnvDataDesc
 {
-    type I = EnvDataDescInstance;
-    fn create_data_instance(self: Arc<Self>,name:&str,byte_postion:u32,bit_position:u32)->Arc<RefCell<Self::I>>
-    {
-       
-        Arc::new(RefCell::new( EnvDataDescInstance{
-            instance_core:DataInstanceCore{datatype:self.clone() ,..Default::default()},
-           
+}
 
-        }))
+impl EnvDataDesc {
+    fn create_instance(datatype:Arc<RefCell<EnvDataDesc>>,name:&str,byte_postion:u32,bit_position:u32)->Arc<RefCell<EnvDataDescInstance>>
+    {
+        let di =  EnvDataDescInstance{
+            instance_core:DataInstanceCore{datatype:datatype ,..Default::default()},
+        };
+        return Arc::new(RefCell::new(di));
 
     }
-
 }
 
 
-
-#[derive(Default)]
+#[derive(Default,Debug)]
 pub struct EnvData
 {
     pub ident:Identity,
     pub params:Vec<Param>
 
 }
-#[derive(Default)]
+#[derive(Default,Debug)]
 pub struct MuxCase
 {
     pub shortname:String,
@@ -327,7 +332,7 @@ pub struct MuxCase
     pub switch_upper_lim:Option<u32>,
     pub is_default:bool
 }
-#[derive(Default)]
+#[derive(Default,Debug)]
 pub struct MuxSwitch
 {
     pub byte_position:Option<u32>,
@@ -335,7 +340,7 @@ pub struct MuxSwitch
     pub bit_position:Option<u32>
 
 }
-#[derive(Default)]
+#[derive(Default,Debug)]
 pub struct EndOfPDUField
 {
     pub ident:Identity,
@@ -354,7 +359,7 @@ pub struct Mux
     pub switch_key:MuxSwitch,
     pub case_start_byte_offset:Option<u32>
 }
-#[derive(Default)]
+#[derive(Default,Debug)]
 pub struct StaticField
 {
    pub   ident:Identity,
@@ -367,24 +372,20 @@ pub struct StaticField
 
 impl DataType for StaticField
 {
-    type I = StaticFieldInstance;
-    fn create_data_instance(self: Arc<Self>,name:&str,byte_postion:u32,bit_position:u32)->Arc<RefCell<Self::I>>
-    {
-       let result =  Arc::new(RefCell::new(
-        StaticFieldInstance{
-            instance_core:DataInstanceCore{..Default::default()},
-           
-
-        }));
-
-        return result;
-    }   
 }
 
+impl StaticField {
+    fn create_instance(datatype:Arc<RefCell<StaticField>>,name:&str,byte_postion:u32,bit_position:u32)->Arc<RefCell<StaticFieldInstance>>
+    {
+        let di =  StaticFieldInstance{
+            instance_core:DataInstanceCore{datatype:datatype ,..Default::default()},
+        };
+        return Arc::new(RefCell::new(di));
 
+    }
+}
 
-
-#[derive(Default)]
+#[derive(Default,Debug)]
 pub struct DynamicLengthField
 {
     pub ident:Identity,
@@ -395,27 +396,39 @@ pub struct DynamicLengthField
     pub byte_pos_length_determined_dop:Option<String>,
 }
 
+impl DynamicLengthField {
+    fn create_instance(datatype:Arc<RefCell<DynamicLengthField>>,name:&str,byte_postion:u32,bit_position:u32)->Arc<RefCell<DynamicLengthFieldInstance>>
+    {
+        let di =  DynamicLengthFieldInstance{
+            instance_core:DataInstanceCore{datatype:datatype ,..Default::default()},
+        };
+        return Arc::new(RefCell::new(di));
 
+    }
+}
+
+#[derive(Default,Debug)]
 pub struct DTCDOP
 {
     pub ident:Identity,
     pub dataObjectProp:DataObjectProp,
     pub dtcs:Vec<Box<DTC>>
 }
-#[derive(Default)]
+#[derive(Default,Debug)]
 pub struct SeviceMsgPayload
 {
     pub ident:Identity,
     pub params:Vec<Param>
 }
 
+#[derive(Debug)]
 pub enum ServiceMsgType {
     Request(SeviceMsgPayload),
     PositiveResponse(SeviceMsgPayload),
     NegativeReponse(SeviceMsgPayload)
 }
 
-#[derive(Default)]
+#[derive(Default,Debug)]
 pub struct DiagSerivce
 {
     pub ident:Identity,

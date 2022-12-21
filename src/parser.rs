@@ -1,3 +1,5 @@
+use std::borrow::Borrow;
+use std::borrow::BorrowMut;
 use std::collections::HashMap;
 use std::sync::Arc;
 use roxmltree::Document;
@@ -9,7 +11,7 @@ use std::fs::{File, OpenOptions};
 use std::io;
 use std::io::prelude::*;
 use std::path::Path;
-
+use std::cell::RefCell;
 pub struct DiagService
 {
     id:Identity,
@@ -23,7 +25,7 @@ pub struct DiagService
 
 pub struct ODXParser
 {
-    pub variants:HashMap<String, Arc<Variant>>,
+    pub variants:HashMap<String, Arc<RefCell<Variant>>>,
     pub current_variant_name:String,
     odxfile:String
 
@@ -79,7 +81,9 @@ impl<'b> ODXParser
         {
             short_name:shortname.to_string(),
             long_name:longname.map(|s|String::from(s)),
-            id:ele.attribute("ID").unwrap().to_string()
+            id:ele.attribute("ID").unwrap().to_string(),
+            ..Default::default()
+
         };
         return ident;
     }
@@ -122,7 +126,7 @@ impl<'b> ODXParser
     }
 
     /// get diag coded type from the parent node, return the option 
-    pub fn __get_diag_coded_type(&mut self,diagcodetypeParent:&Node)->Option<Arc<DiagCodedType>>
+    pub fn __get_diag_coded_type(&mut self,diagcodetypeParent:&Node)->Option<Arc<RefCell<DiagCodedType>>>
     {
 
         let result = match diagcodetypeParent.descendants().find(|n|n.tag_name().name() == "DIAG-CODED-TYPE")
@@ -133,12 +137,12 @@ impl<'b> ODXParser
                 let ishighlow = diagcodetype.attribute("IS-HIGHLOW-BYTE-ORDER").map(|ishighlow|ishighlow=="false");
                 let bitlength = self.__get_descendantText(&diagcodetype,"BIT-LENGTH").map(|bitlength|bitlength.parse::<u32>().unwrap());
                 
-                Arc::new(DiagCodedType {
+                Arc::new(RefCell::new(DiagCodedType {
                    aa_type:aatype.map(|n|String::from(n)),
                    base_type:basedatatype.map(|n|String::from(n)),
                    ishighbyteorder:ishighlow,
                    bit_length:bitlength  
-                })
+                }))
             }),
             _=>None
         };
@@ -388,7 +392,7 @@ impl<'b> ODXParser
             ident:identitity,
             bytesize:bytesize.map(|s|s.parse::<u32>().unwrap()),
             params:Vec::new(),
-            variantId:String::new()
+            
 
         };
         for ele in node.descendants()
@@ -601,97 +605,100 @@ impl<'b> ODXParser
                 let mut variant = Variant::default();
                 self.current_variant_name = ident.short_name.clone();
                 variant.id = ident;
+                let variant_id = variant.id.id.clone();
+                let arc_variant = Arc::new(RefCell::new(variant));
+                
                 for desdentnode in ele.descendants()
                 {
                     //println!("{}",desdentnode.tag_name().name());
                     if desdentnode.tag_name().name() == "FUNCT-CLASS"
                     {
                         let funclass = self.__get_func_class(&desdentnode);
-                        variant.func_classes.insert(variant.id.id.clone(), Arc::new(funclass));
+                        arc_variant.as_ref().borrow_mut().func_classes.insert(variant_id.clone(), Arc::new(RefCell::new(funclass)));
                     }
 
                     else if  desdentnode.tag_name().name() == "DTC-DOP"
                     {
                         let dtcdop = self.__get_dtc_dop(&desdentnode);
-                        variant.dtc_object_props.insert(dtcdop.ident.id.clone(), Arc::new(dtcdop));
+                        arc_variant.as_ref().borrow_mut().dtc_object_props.insert(dtcdop.ident.id.clone(), Arc::new(RefCell::new(dtcdop)));
                     }
                     else if  desdentnode.tag_name().name() == "DATA-OBJECT-PROP"
                     {
                         let dataprop = self.__get_data_prop(&desdentnode);
                         //println!("{:p}",&dataprop);
                        
-                        variant.data_object_props.insert(dataprop.ident.id.clone(), Arc::new(dataprop));
+                        arc_variant.as_ref().borrow_mut().data_object_props.insert(dataprop.ident.id.clone(), Arc::new(RefCell::new(dataprop)));
                     }
                     else if  desdentnode.tag_name().name() == "ENV-DATA-DESC"
                     {
                         let dataprop = self.__get_env_data_desc(&desdentnode);
-                        variant.env_data_descs.insert(dataprop.ident.id.clone(), Arc::new(dataprop));
+                        arc_variant.as_ref().borrow_mut().env_data_descs.insert(dataprop.ident.id.clone(), Arc::new(RefCell::new(dataprop)));
                     }
                     else if  desdentnode.tag_name().name() == "STRUCTURE"
                     {
                         let mut dataprop = self.__get_struct(&desdentnode);
-                        dataprop.variantId = variant.id.id.clone();
-                        variant.structures.insert(dataprop.ident.id.clone(), Arc::new(dataprop));
+                        dataprop.ident.variant = Some(arc_variant.clone());
+                        arc_variant.as_ref().borrow_mut().structures.insert(dataprop.ident.id.clone(), Arc::new(RefCell::new(dataprop)));
                     }
                     else if  desdentnode.tag_name().name() == "STATIC-FIELD"
                     {
                         let mut dataprop = self.__get_static_field(&desdentnode);
-                        dataprop.variant_id = variant.id.id.clone();
-                        variant.static_fileds.insert(dataprop.ident.id.clone(), Arc::new(dataprop));
+                        dataprop.variant_id = variant_id.clone();
+                        arc_variant.as_ref().borrow_mut().static_fileds.insert(dataprop.ident.id.clone(), Arc::new(RefCell::new(dataprop)));
                     }
                     else if  desdentnode.tag_name().name() == "DYNAMIC_LENGTH_FIELD"
                     {
                         let mut dataprop = self.__get_dynamic_field(&desdentnode);
-                        dataprop.variant_id = variant.id.id.clone();
-                        variant.dynamic_fileds.insert(dataprop.ident.id.clone(), Arc::new(dataprop));
+                        dataprop.ident.variant = Some(arc_variant.clone());
+                        arc_variant.as_ref().borrow_mut().dynamic_fileds.insert(dataprop.ident.id.clone(), Arc::new(RefCell::new(dataprop)));
                     }
                     else if  desdentnode.tag_name().name() == "END-OF-PDU-FIELD"
                     {
                         let mut dataprop = self.__get_endofpdu_field(&desdentnode);
-                        dataprop.variant_id = variant.id.id.clone();
-                        variant.endofpdu_fileds.insert(dataprop.ident.id.clone(), Arc::new(dataprop));
+                        dataprop.ident.variant = Some(arc_variant.clone());
+                        arc_variant.as_ref().borrow_mut().endofpdu_fileds.insert(dataprop.ident.id.clone(), Arc::new(RefCell::new(dataprop)));
                     }
                     else if  desdentnode.tag_name().name() == "UNIT"
                     {
                         let mut dataprop = self.__get_unit(&desdentnode);
                         
-                        variant.units.insert(dataprop.ident.id.clone(), Arc::new(dataprop));
+                        arc_variant.as_ref().borrow_mut().units.insert(dataprop.ident.id.clone(), Arc::new(RefCell::new(dataprop)));
                     }
 
                     else if  desdentnode.tag_name().name() == "DIAG-SERVICE"
                     {
                         let mut dataprop = self.__get_diag_service(&desdentnode);
                         
-                        variant.diag_comms.insert(dataprop.ident.id.clone(), Arc::new(dataprop));
+                        arc_variant.as_ref().borrow_mut().diag_comms.insert(dataprop.ident.id.clone(), Arc::new(RefCell::new(dataprop)));
                     }
                     else if  desdentnode.tag_name().name() == "REQUEST"
                     {
                         let mut dataprop = self.__get_serive_msg(&desdentnode);
                         
-                        variant.requests.insert(dataprop.ident.id.clone(), Arc::new(ServiceMsgType::Request(dataprop)));
+                        arc_variant.as_ref().borrow_mut().requests.insert(dataprop.ident.id.clone(), Arc::new(RefCell::new(ServiceMsgType::Request(dataprop))));
                     }
                     else if  desdentnode.tag_name().name() == "POS-RESPONSE"
                     {
                         let mut dataprop = self.__get_serive_msg(&desdentnode);
                         
-                        variant.pos_responses.insert(dataprop.ident.id.clone(), Arc::new(ServiceMsgType::Request(dataprop)));
+                        arc_variant.as_ref().borrow_mut().pos_responses.insert(dataprop.ident.id.clone(), Arc::new(RefCell::new(ServiceMsgType::Request(dataprop))));
                     }
                     else if  desdentnode.tag_name().name() == "NEG-RESPONSE"
                     {
                         let mut dataprop = self.__get_serive_msg(&desdentnode);
                         
-                        variant.neg_responses.insert(dataprop.ident.id.clone(), Arc::new(ServiceMsgType::Request(dataprop)));
+                        arc_variant.as_ref().borrow_mut().neg_responses.insert(dataprop.ident.id.clone(), Arc::new(RefCell::new(ServiceMsgType::Request(dataprop))));
                     }
                     else if  desdentnode.tag_name().name() == "COMPARAM-REF"
                     {
                         let mut dataprop = self.__get_comparm_ref(&desdentnode);
                         
-                        variant.comparam_refs.insert(dataprop.ref_id.clone(), Arc::new(dataprop));
+                        arc_variant.as_ref().borrow_mut().comparam_refs.insert(dataprop.ref_id.clone(), Arc::new(RefCell::new(dataprop)));
                     }
-                    
-
                 }
-                self.variants.insert(variant.id.id.clone(), Arc::new(variant));
+
+                
+                self.variants.insert(variant_id.clone(), arc_variant.clone());
         
                 
             }

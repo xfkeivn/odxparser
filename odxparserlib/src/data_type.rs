@@ -3,7 +3,10 @@ use std::fmt::Debug;
 use std::sync::{Arc};
 use crate::data_instance::*;
 use std::cell::{RefCell, Ref};
+
 pub trait DataType{
+    type InstanceType;
+    fn create_instance(datatype:Arc<RefCell<Self>>,name:&str,byte_postion:u32,bit_position:u32)->Arc<RefCell<Self::InstanceType>>;
     fn is_high_low_byte_order(&self)->bool
     {return false;}
 
@@ -40,6 +43,7 @@ pub struct  Variant
     pub static_fileds:HashMap<String,Arc<RefCell<StaticField>>>,
     pub dynamic_fileds:HashMap<String,Arc<RefCell<DynamicLengthField>>>,
     pub endofpdu_fileds:HashMap<String,Arc<RefCell<EndOfPDUField>>>,
+    pub muxs:HashMap<String,Arc<RefCell<Mux>>>,
     pub units:HashMap<String,Arc<RefCell<Unit>>>,
     pub diag_comms:HashMap<String,Arc<RefCell<DiagSerivce>>>,
     pub requests:HashMap<String,Arc<RefCell<ServiceMsgType>>>,
@@ -90,6 +94,7 @@ pub struct Param
     pub variant_id:String,
     pub physical_constant_value:Option<u32>,
     pub diag_coded_type:Option<Arc<RefCell<DiagCodedType>>>,
+    pub reversed:Option<Arc<RefCell<Reversed>>>,
     pub variant:Option<Arc<RefCell<Variant>>>
 }
 
@@ -99,7 +104,14 @@ impl Param {
     {
         let name = &self.shortname;
         let byte_position = self.byte_position.unwrap();
-        let bit_position = self.bit_position.unwrap_or(0);
+        let bit_position = self.bit_position.unwrap_or_default();
+
+
+        if variant.is_none()
+        {
+            panic!("Variant is None");
+        }
+
         if self.dop_ref.is_none()
         {
             if let Some(p) = &self.diag_coded_type
@@ -108,6 +120,11 @@ impl Param {
                 return DiagCodedType::create_instance(p.clone(), name, byte_position, bit_position)
             }
             else {
+
+                if let Some(p) = &self.reversed
+                {
+                    return Reversed::create_instance(p.clone(), name, byte_position, bit_position)
+                }
                 panic!("The ref is None and it is not diag coded type is not invalid mode");
             }
         }
@@ -137,8 +154,14 @@ impl Param {
         {
             DynamicLengthField::create_instance(p.clone(), name, bit_position, bit_position)
         }
-
-
+        else if let Some(p) =variant.as_ref().unwrap().borrow().endofpdu_fileds.get(self.dop_ref.as_ref().unwrap())
+        {
+            EndOfPDUField::create_instance(p.clone(), name, bit_position, bit_position)
+        }
+        else if let Some(p) =variant.as_ref().unwrap().borrow().muxs.get(self.dop_ref.as_ref().unwrap())
+        {
+            Mux::create_instance(p.clone(), name, bit_position, bit_position)
+        }
         else {
             panic!("")
         }
@@ -180,8 +203,7 @@ pub struct DiagCodedType
 
 impl DataType for DiagCodedType
 {
-}
-impl DiagCodedType {
+    type InstanceType = CodedDataDataInstance ;
     fn create_instance(datatype:Arc<RefCell<DiagCodedType>>,name:&str,byte_postion:u32,bit_position:u32)->Arc<RefCell<CodedDataDataInstance>>
     {
         let di =  CodedDataDataInstance{
@@ -191,12 +213,6 @@ impl DiagCodedType {
 
     }
 }
-
-
-
-
-
-
 
 
 #[derive(Debug)]
@@ -240,10 +256,7 @@ impl DataObjectProp {
 
 impl DataType for DataObjectProp
 {
-
-}
-
-impl DataObjectProp {
+    type InstanceType = DataObjectPropDataInstance;
     fn create_instance(datatype:Arc<RefCell<DataObjectProp>>,name:&str,byte_postion:u32,bit_position:u32)->Arc<RefCell<DataObjectPropDataInstance>>
     {
         let di =  DataObjectPropDataInstance{
@@ -269,19 +282,17 @@ pub struct Structure
 
 impl DataType for Structure {
    
-}
-
-impl Structure {
+    type InstanceType = StructureDataInstance;
     fn create_instance(datatype:Arc<RefCell<Structure>>,name:&str,byte_postion:u32,bit_position:u32)->Arc<RefCell<StructureDataInstance>>
     {
         let mut di =  Arc::new(RefCell::new(StructureDataInstance{
             instance_core:DataInstanceCore{datatype:datatype.clone() ,..Default::default()},
             ..Default::default()
         }));
-        let b = datatype.borrow_mut();
-        for param in b.params.iter()
+        let dt = datatype.borrow_mut();
+        for param in dt.params.iter()
         {   
-            let mut child = param.create_data_instance(b.ident.variant.clone());
+            let mut child = param.create_data_instance(dt.ident.variant.clone());
             
             child.borrow_mut().set_parent(di.clone());
             di.borrow_mut().children_instances.push(child);
@@ -304,9 +315,7 @@ pub struct EnvDataDesc{
 
 impl DataType for EnvDataDesc
 {
-}
-
-impl EnvDataDesc {
+    type InstanceType = EnvDataDescInstance;
     fn create_instance(datatype:Arc<RefCell<EnvDataDesc>>,name:&str,byte_postion:u32,bit_position:u32)->Arc<RefCell<EnvDataDescInstance>>
     {
         let di =  EnvDataDescInstance{
@@ -317,7 +326,23 @@ impl EnvDataDesc {
     }
 }
 
+#[derive(Debug,Default)]
+pub struct Reversed
+{
 
+}
+
+impl DataType for Reversed {
+    type InstanceType = ReversedInstance;
+    fn create_instance(datatype:Arc<RefCell<Reversed>>,name:&str,byte_postion:u32,bit_position:u32)->Arc<RefCell<ReversedInstance>>
+    {
+        let di =  ReversedInstance{
+            instance_core:DataInstanceCore{datatype:datatype ,..Default::default()},
+        };
+        return Arc::new(RefCell::new(di));
+
+    }
+}
 #[derive(Default,Debug)]
 pub struct EnvData
 {
@@ -351,7 +376,21 @@ pub struct EndOfPDUField
     pub basic_struct_ref:Option<String>,
     pub variant_id:String,
 }
-#[derive(Default)]
+
+
+impl  EndOfPDUField
+{
+    fn create_instance(datatype:Arc<RefCell<EndOfPDUField>>,name:&str,byte_postion:u32,bit_position:u32)->Arc<RefCell<EndOfPDUFieldInstance>>
+    {
+        let di =  EndOfPDUFieldInstance{
+            instance_core:DataInstanceCore{datatype:datatype ,..Default::default()},
+        };
+        return Arc::new(RefCell::new(di));
+
+    }
+}
+
+#[derive(Default,Debug)]
 pub struct Mux
 {
     pub ident:Identity,
@@ -361,6 +400,20 @@ pub struct Mux
     pub switch_key:MuxSwitch,
     pub case_start_byte_offset:Option<u32>
 }
+
+impl Mux {
+    fn create_instance(datatype:Arc<RefCell<Mux>>,name:&str,byte_postion:u32,bit_position:u32)->Arc<RefCell<MuxInstance>>
+    {
+        let di =  MuxInstance{
+            instance_core:DataInstanceCore{datatype:datatype ,..Default::default()},
+        };
+        return Arc::new(RefCell::new(di));
+
+    }
+}
+
+
+
 #[derive(Default,Debug)]
 pub struct StaticField
 {
@@ -372,11 +425,12 @@ pub struct StaticField
 
 }
 
+
+
+
 impl DataType for StaticField
 {
-}
-
-impl StaticField {
+    type InstanceType = StaticFieldInstance;
     fn create_instance(datatype:Arc<RefCell<StaticField>>,name:&str,byte_postion:u32,bit_position:u32)->Arc<RefCell<StaticFieldInstance>>
     {
         let di =  StaticFieldInstance{
@@ -392,7 +446,6 @@ pub struct DynamicLengthField
 {
     pub ident:Identity,
     pub ref_struct_id:Option<String>,
-    pub variant_id:String,
     pub offset_of_first_basic_structure:Option<u32>,
     //length_determind_dop_refid:Option<String>
     pub byte_pos_length_determined_dop:Option<String>,

@@ -11,9 +11,14 @@ use parser::ODXParser;
 pub mod parser;
 pub mod data_instance;
 pub mod data_type;
-use data_instance::*;
-
-
+use clap::Parser;
+#[derive(Parser)]
+struct Cli {
+    /// The pattern to look for
+    pattern: String,
+    /// The path to the file to read
+    path: std::path::PathBuf,
+}
 
 
 #[cfg(test)]
@@ -27,22 +32,24 @@ mod tests {
     #[test]
     fn parsing()
     {
-        let odxpath = r"D:\Workspace\RustApp\odxparser\src\CN180S_V1.0.80.odx";
-        
-        //let odxpath = r"E:\WORKSPACE\RustApps\odx_parser\src\CN180S_V1.0.80.odx";
+        //let odxpath = r"D:\Workspace\RustApp\odxparser\src\CN180S_V1.0.80.odx";
+        let args = Cli::parse();
+        let odxpath = r"E:\WORKSPACE\RustApps\odx_parser\src\CN180S_V1.0.80.odx";
         let mut parser = parser::ODXParser::new();
         parser.parse(odxpath);
         for (key,variant) in parser.variants.iter()
         {
-            for (k,v) in variant.borrow().diag_comms.iter()
+            let var = &*variant.as_ref().borrow();
+
+            for (k,v) in var.diag_comms.iter()
             { 
-                let diag_service = variant.borrow().diag_comms.get(k);
+                let diag_service = var.diag_comms.get(k);
 
                 let mut serviceInstance = DiagServiceInstance{..Default::default()};
 
-                if let Some(p)= variant.borrow().requests.get(&diag_service.unwrap().borrow().request_ref)
+                if let Some(p)= var.requests.get(&diag_service.unwrap().as_ref().borrow().request_ref)
                 {   
-                    if let ServiceMsgType::Request(p2) = *p.borrow()
+                    if let ServiceMsgType::Request(p2) = &*p.as_ref().borrow()
                     {
                         let mut request_instance = ServiceMessageInstance{..Default::default()};
 
@@ -58,11 +65,12 @@ mod tests {
                     
 
                 }
-                if diag_service.unwrap().borrow().pos_response_ref.is_some()
+                if diag_service.unwrap().as_ref().borrow().pos_response_ref.is_some()
                 {
-                    if let Some(p)= variant.borrow().pos_responses.get(diag_service.unwrap().borrow().pos_response_ref.unwrap().as_ref())
+                    let key = &*diag_service.unwrap().as_ref().borrow();
+                    if let Some(p)= var.pos_responses.get::<String>(key.pos_response_ref.as_ref().unwrap())
                     {   
-                        if let ServiceMsgType::PositiveResponse(p2) = *p.borrow()
+                        if let ServiceMsgType::PositiveResponse(p2) = &*p.as_ref().borrow()
                         {
                             let mut response_instance = ServiceMessageInstance{..Default::default()};
     
@@ -79,11 +87,12 @@ mod tests {
     
                     }
                 }
-                if diag_service.unwrap().borrow().neg_response_ref.is_some()
+                if diag_service.unwrap().as_ref().borrow().neg_response_ref.is_some()
                 {
-                    if let Some(p)= variant.borrow().neg_responses.get(diag_service.unwrap().borrow().neg_response_ref.unwrap().as_ref())
+                    let key =&diag_service;
+                    if let Some(p)= var.neg_responses.get("")
                     {   
-                        if let ServiceMsgType::NegativeReponse(p2) = *p.borrow()
+                        if let ServiceMsgType::NegativeReponse(p2) = &*p.as_ref().borrow()
                         {
                             let mut neg_response_instance = ServiceMessageInstance{..Default::default()};
     

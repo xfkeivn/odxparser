@@ -112,31 +112,33 @@ impl Param {
             }
         }
 
-        else if let Some(p) = self.variant.as_ref().unwrap().borrow().data_object_props.get(self.dop_ref.as_ref().unwrap())
+        else if let Some(p) = variant.as_ref().unwrap().borrow().data_object_props.get(self.dop_ref.as_ref().unwrap())
         {
            DataObjectProp::create_instance(p.clone(), name, byte_position, bit_position)
            
         }
-        else if let Some(p) =self.variant.as_ref().unwrap().borrow().structures.get(self.dop_ref.as_ref().unwrap())
+        else if let Some(p) =variant.as_ref().unwrap().borrow().structures.get(self.dop_ref.as_ref().unwrap())
         {
             Structure::create_instance(p.clone(), name, byte_position, bit_position)
             
         }
-        else if let Some(p) =self.variant.as_ref().unwrap().borrow().static_fileds.get(self.dop_ref.as_ref().unwrap())
+        else if let Some(p) =variant.as_ref().unwrap().borrow().static_fileds.get(self.dop_ref.as_ref().unwrap())
         {
             StaticField::create_instance(p.clone(), name, byte_position, bit_position)
             
         }
       
-        else if let Some(p) =self.variant.as_ref().unwrap().borrow().env_data_descs.get(self.dop_ref.as_ref().unwrap())
+        else if let Some(p) =variant.as_ref().unwrap().borrow().env_data_descs.get(self.dop_ref.as_ref().unwrap())
         {
             EnvDataDesc::create_instance(p.clone(), name, bit_position, bit_position)
       
         }
-        else if let Some(p) =self.variant.as_ref().unwrap().borrow().dynamic_fileds.get(self.dop_ref.as_ref().unwrap())
+        else if let Some(p) =variant.as_ref().unwrap().borrow().dynamic_fileds.get(self.dop_ref.as_ref().unwrap())
         {
             DynamicLengthField::create_instance(p.clone(), name, bit_position, bit_position)
         }
+
+
         else {
             panic!("")
         }
@@ -276,10 +278,10 @@ impl Structure {
             instance_core:DataInstanceCore{datatype:datatype.clone() ,..Default::default()},
             ..Default::default()
         }));
-
-        for param in datatype.borrow_mut().params.iter()
+        let b = datatype.borrow_mut();
+        for param in b.params.iter()
         {   
-            let mut child = param.create_data_instance(datatype.borrow_mut().ident.variant.clone());
+            let mut child = param.create_data_instance(b.ident.variant.clone());
             
             child.borrow_mut().set_parent(di.clone());
             di.borrow_mut().children_instances.push(child);

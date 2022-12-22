@@ -2,7 +2,8 @@
 use std::sync::Arc;
 use std::cell::RefCell;
 use bitvec::prelude::*;
-use crate::data_type::{ComputeMethod,InternalConstrain, DiagCodedType, DataObjectProp, Structure, DynamicLengthField,Mux,EndOfPDUField, EnvDataDesc, StaticField};
+use marcolib::Instance;
+use crate::data_type::{ComputeMethod,InternalConstrain, DiagCodedType, DataObjectProp, Structure, DynamicLengthField,Mux,EndOfPDUField, EnvDataDesc, StaticField, Reversed};
 
 pub trait TDataInstance
 {
@@ -84,52 +85,25 @@ impl TDataInstance for CodedDataDataInstance
    
 }
 
-#[derive(Default)]
+#[derive(Default,Instance)]
 pub struct DataObjectPropDataInstance
 {
     pub instance_core:DataInstanceCore<DataObjectProp>
 }
 
-impl TDataInstance for DataObjectPropDataInstance
-{
-    fn get_parent(&self)->&Option<Arc<RefCell<dyn TDataInstance >>>
-    {
-        return &self.instance_core.parent;
-    }
 
-    fn set_parent(&mut self,parent:Arc<RefCell<dyn TDataInstance>>)
-    {
-       
-       self.instance_core.parent = Some(parent);
-    }
-    
-   
-}
-
-
+#[derive(Instance)]
 pub struct StaticFieldInstance
 { 
     pub instance_core:DataInstanceCore<StaticField>,
 
 }
+#[derive(Default,Instance)]
+pub struct ReversedInstance
+{ 
+    pub instance_core:DataInstanceCore<Reversed>,
 
-impl TDataInstance for StaticFieldInstance
-{
-    fn get_parent(&self)->&Option<Arc<RefCell<dyn TDataInstance >>>
-    {
-        return &self.instance_core.parent;
-    }
-
-    fn set_parent(&mut self,parent:Arc<RefCell<dyn TDataInstance>>)
-    {
-       
-       self.instance_core.parent = Some(parent);
-    }
-    
-   
 }
-
-
 
 impl StaticFieldInstance {
     fn get_element_name(&self)->String {
@@ -139,95 +113,34 @@ impl StaticFieldInstance {
     
 }
 
+#[derive(Instance)]
 pub struct DynamicLengthFieldInstance
 { 
     pub instance_core:DataInstanceCore<DynamicLengthField>,
 
 }
 
-impl TDataInstance for DynamicLengthFieldInstance
-{
-    fn get_parent(&self)->&Option<Arc<RefCell<dyn TDataInstance >>>
-    {
-        return &self.instance_core.parent;
-    }
 
-    fn set_parent(&mut self,parent:Arc<RefCell<dyn TDataInstance>>)
-    {
-       
-       self.instance_core.parent = Some(parent);
-    }
-    
-   
-}
+#[derive(Instance)]
 pub struct MuxInstance
 {
     pub instance_core:DataInstanceCore<Mux>,
 }
 
-impl TDataInstance for MuxInstance
-{
-    fn get_parent(&self)->&Option<Arc<RefCell<dyn TDataInstance >>>
-    {
-        return &self.instance_core.parent;
-    }
 
-    fn set_parent(&mut self,parent:Arc<RefCell<dyn TDataInstance>>)
-    {
-       
-       self.instance_core.parent = Some(parent);
-    }
-    
-   
-}
 
+#[derive(Instance)]
 pub struct EndOfPDUFieldInstance
 {
     pub instance_core:DataInstanceCore<EndOfPDUField>,
 }
 
-impl TDataInstance for EndOfPDUFieldInstance
-{
-    fn get_parent(&self)->&Option<Arc<RefCell<dyn TDataInstance >>>
-    {
-        return &self.instance_core.parent;
-    }
 
-    fn set_parent(&mut self,parent:Arc<RefCell<dyn TDataInstance>>)
-    {
-       
-       self.instance_core.parent = Some(parent);
-    }
-    
-   
-}
-
+#[derive(Instance)]
 pub struct EnvDataDescInstance
 {
     pub instance_core:DataInstanceCore<EnvDataDesc>,
 }
-
-
-impl TDataInstance for EnvDataDescInstance
-{
-    fn get_parent(&self)->&Option<Arc<RefCell<dyn TDataInstance >>>
-    {
-        return &self.instance_core.parent;
-    }
-
-    fn set_parent(&mut self,parent:Arc<RefCell<dyn TDataInstance>>)
-    {
-       
-       self.instance_core.parent = Some(parent);
-    }
-    
-   
-}
-
-
-
-
-
 
 
 
@@ -235,12 +148,6 @@ impl TDataInstance for EnvDataDescInstance
 pub struct ServiceMessageInstance{
     pub param_instances:Vec<Arc<RefCell<dyn TDataInstance>>>
 }
-
-
-
-
-
-
 
 #[derive(Default)]
 pub struct StructureDataInstance
@@ -252,6 +159,7 @@ pub struct StructureDataInstance
 
 impl StructureDataInstance
 {
+
 
 }
 
@@ -272,7 +180,6 @@ impl TDataInstance for StructureDataInstance
     {
         let parent = self.instance_core.parent.as_ref();
         let full_name;
-        let parent_full_name:String;
         match  parent
         {
         Some(p)=>{
@@ -285,9 +192,6 @@ impl TDataInstance for StructureDataInstance
         }
         }
         return full_name;
-
-                
-            
         }
 
    

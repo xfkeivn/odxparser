@@ -366,6 +366,16 @@ impl<'b> ODXParser
            }
 
         };
+        let mut reversed;
+        if dop_ref.is_none()
+        {
+            reversed = Some(Arc::new(RefCell::new(Reversed{})));
+        }
+        else
+        {
+            reversed = Option::None;
+        }
+        
     
         return Param { 
                         aa_type:aatype,
@@ -380,7 +390,8 @@ impl<'b> ODXParser
                         dop_ref:dop_ref.map(|n|String::from(n)),
                         physical_constant_value:phys_constant_value.map(|s|s.parse::<u32>().unwrap()),
                         diag_coded_type:(self.__get_diag_coded_type(node)),
-                        variant:Option::None}
+                        variant:Option::None,
+                        reversed:reversed}
        
     }
 
@@ -442,7 +453,7 @@ impl<'b> ODXParser
             byte_pos_length_determined_dop:dopref,
             offset_of_first_basic_structure:offset_of_first_basicstructure,
             //length_determind_dop_refid:dopref,
-            variant_id:String::new()
+
         }
     }
 
@@ -590,8 +601,6 @@ impl<'b> ODXParser
 
     }
 
-
-
     pub fn __parseDocument<'c>(&mut self,doc:&'c Document)->()
     {
         
@@ -694,6 +703,12 @@ impl<'b> ODXParser
                         let mut dataprop = self.__get_comparm_ref(&desdentnode);
                         
                         arc_variant.as_ref().borrow_mut().comparam_refs.insert(dataprop.ref_id.clone(), Arc::new(RefCell::new(dataprop)));
+                    }
+                    else if  desdentnode.tag_name().name() == "MUX"
+                    {
+                        let mut dataprop = self.__get_mux(&desdentnode);
+                        
+                        arc_variant.as_ref().borrow_mut().muxs.insert(dataprop.ident.id.clone(), Arc::new(RefCell::new(dataprop)));
                     }
                 }
 

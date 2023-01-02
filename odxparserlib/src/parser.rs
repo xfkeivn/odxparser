@@ -1,10 +1,8 @@
-use std::borrow::Borrow;
-use std::borrow::BorrowMut;
+use crate::data_instance::*;
 use std::collections::HashMap;
 use std::sync::Arc;
 use roxmltree::Document;
 use roxmltree::Node;
-use crate::data_instance;
 use crate::data_type::*;
 use std::fs;
 use std::fs::{File, OpenOptions};
@@ -22,19 +20,20 @@ pub struct DiagService
     func_class_ref:Option<u32>,
     parserContext:ODXParser
 }
-
+#[derive(Default)]
 pub struct ODXParser
 {
     pub variants:HashMap<String, Arc<RefCell<Variant>>>,
     pub current_variant_name:String,
-    odxfile:String
+    odxfile:String,
+    pub variant_service_instances:HashMap<String,Vec<DiagServiceInstance>>
 
 }
 impl<'b> ODXParser
 {
     pub fn new()->ODXParser
     {
-        return ODXParser{variants:HashMap::new(),odxfile:String::new(),current_variant_name:String::default()}
+        return ODXParser{variants:HashMap::new(),odxfile:String::new(),current_variant_name:String::default(),..Default::default()}
     }
     pub fn parse(&mut self,odxfile:&str)->bool
     {
@@ -46,16 +45,96 @@ impl<'b> ODXParser
         match f.read_to_string(&mut s) {
         Ok(_) => {
             
-
            doc = roxmltree::Document::parse(&s).unwrap();
             self.__parseDocument(&doc);
-            
+            self.__create_instances();
+
             return true;
         },
         Err(e) =>false
          }
     }
 
+    fn __create_instances(&mut self)
+    {
+        for (key,variant) in self.variants.iter()
+        {
+            let var = &*variant.as_ref().borrow();
+            
+            let mut service_instances = Vec::<DiagServiceInstance>::new(); 
+            for (k,v) in var.diag_comms.iter()
+            { 
+                let diag_service = var.diag_comms.get(k);
+                let diagservice = &*diag_service.unwrap().as_ref().borrow();
+                let request_ref :&str= diagservice.request_ref.as_ref();
+                let mut serviceInstance = DiagServiceInstance{..Default::default()};
+
+                if let Some(p)=var.requests.get(request_ref)
+                {   
+                    if let ServiceMsgType::Request(p2) = &*p.as_ref().borrow_mut()
+                    {
+                        let mut request_instance = ServiceMessageInstance{..Default::default()};
+
+                    for param in p2.params.iter()
+                    {   
+                        let param_instance = param.create_data_instance(Some(variant.clone()));
+                        request_instance.param_instances.push(param_instance);
+                        
+                        
+                    }
+                    serviceInstance.request_instance = request_instance;
+
+                    }
+                }
+                if diagservice.pos_response_ref.is_some()
+                {
+                    if let Some(p)= var.pos_responses.get(diagservice.pos_response_ref.as_ref().unwrap())
+                    {   
+                        if let ServiceMsgType::PositiveResponse(p2) =  &*p.as_ref().borrow()
+                        {
+                            let mut response_instance = ServiceMessageInstance{..Default::default()};
+    
+                        for param in p2.params.iter()
+                        {
+                            let param_instance = param.create_data_instance(Some(variant.clone()));
+                            response_instance.param_instances.push(param_instance);
+                            
+                        }
+                        serviceInstance.positive_response_instance = response_instance;
+    
+                        }
+                        
+    
+                    }
+                }
+                if diagservice.neg_response_ref.is_some()
+                {
+                    if let Some(p)= var.neg_responses.get(diagservice.neg_response_ref.as_ref().unwrap())
+                    {   
+                        if let ServiceMsgType::NegativeReponse(p2) = &*p.as_ref().borrow()
+                        {
+                            let mut neg_response_instance = ServiceMessageInstance{..Default::default()};
+    
+                        for param in p2.params.iter()
+                        {
+                            let param_instance = param.create_data_instance(Some(variant.clone()));
+                            neg_response_instance.param_instances.push(param_instance);
+                            
+                        }
+                        serviceInstance.negative_response_instance = neg_response_instance;
+    
+                        }
+                        
+    
+                    }
+                }
+                service_instances.push(serviceInstance);  
+            }
+            self.variant_service_instances.insert(var.id.short_name.clone(), service_instances); 
+            
+
+        }
+    }
 
     pub fn __get_descendantText<'a>(&mut self,parentnode:&Node<'a,'_>,textnodename:&str)->Option<&'a str>
     {

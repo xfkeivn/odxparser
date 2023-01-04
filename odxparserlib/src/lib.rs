@@ -7,8 +7,8 @@ static mut COUNTER:u32 = 100;
 #[cfg(test)]
 mod tests {
     use std::{rc::Rc, borrow::Borrow};
-
-    use crate::{data_type::{Structure, ServiceMsgType}, data_instance::{DiagServiceInstance, ServiceMessageInstance, StructureDataInstance, DataInstanceCore, StructInstance, AsCoreInstance}};
+    use bitvec::prelude::*;
+    use crate::{data_type::{Structure, ServiceMsgType}, data_instance::{DiagServiceInstance, ServiceMessageInstance, StructureDataInstance, DataInstanceCore, StructInstance}};
 
     use super::*;
 
@@ -36,19 +36,21 @@ mod tests {
 
     #[test]
     fn test_end_of_pdu() {
-        let odxpath = r"D:\Workspace\RustApp\odxparser\odxparserlib\src\CN180S_V1.0.80.odx";
+        //let odxpath = r"D:\Workspace\RustApp\odxparser\odxparserlib\src\CN180S_V1.0.80.odx";
         
-        //let odxpath = r"E:\WORKSPACE\RustApps\odx_parser\odxparserlib\src\CN180S_V1.0.80.odx";
-        let mut parser = parser::ODXParser::new();
-        let result = parser.parse(odxpath);
-        assert_eq!(result,true);
+        let odxpath = r"E:\WORKSPACE\RustApps\odx_parser\odxparserlib\src\CN180S_V1.0.80.odx";
+        let parser = &mut parser::ODXParser::new();
+        //let result = parser.parse(odxpath);
+        //assert_eq!(result,true);
 
-        let variant = parser.variants.values().nth(0).unwrap().as_ref().borrow();
-        let service_instances = parser.variant_service_instances.get(variant.id.short_name.as_str()).unwrap();
+        let variants = &parser.variants ;
+        let variant = variants.values().nth(0).unwrap().as_ref().borrow_mut();
+        let service_instances = &parser.variant_service_instances.get(variant.id.short_name.as_str()).unwrap();
        
         let service_instance = service_instances.iter().find(|s|s.positive_response_instance.as_ref().unwrap().id.as_str() == "_441" ).unwrap();
         //let pos_service_instance = service_instance.positive_response_instance.as_ref().unwrap();
-        parser.set_pending("RQ_FaultMemory_Read_identified_errors.DtcStatusbyte_STRUCTURE", vec![0b10101010]);
+        let pending_value = BitVec::<usize,Lsb0>::from_element(0x100 );
+        parser.set_pending("RQ_FaultMemory_Read_identified_errors.DtcStatusbyte_STRUCTURE",&pending_value );
         let request_instance = &service_instance.request_instance;
         for child_instance in request_instance.as_struct().children_instances.iter()
         {

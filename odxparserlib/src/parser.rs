@@ -29,7 +29,6 @@ pub struct ODXParser
     pub current_variant_name:String,
     odxfile:String,
     pub variant_service_instances:HashMap<String,Vec<DiagServiceInstance>>
-
 }
 impl<'b> ODXParser
 {
@@ -70,14 +69,16 @@ impl<'b> ODXParser
 
     }
 
-    fn get_service_request_instance(&self,reqeust_name:&str)->&ServiceMessageInstance
+    fn get_service_request_instance(&mut self,reqeust_name:&str)->& mut ServiceMessageInstance
     {
         for (_key,variant) in self.variants.iter()
         {
             let var = &*variant.as_ref().borrow();
-            let serviceinstances  = self.variant_service_instances.get(var.id.short_name.as_str()).unwrap();
-            let service_instance = serviceinstances.iter().find(|s|s.request_instance.short_name.as_str() == reqeust_name);
-            return service_instance.map(|s|&s.request_instance).unwrap();
+            let serviceinstances  = self.variant_service_instances.get_mut(var.id.short_name.as_str()).unwrap();
+            let service_instance = serviceinstances.iter_mut().find(|s|s.request_instance.short_name.as_str() == reqeust_name);
+            let mus= service_instance.map(|s|&mut s.request_instance).unwrap();
+            return mus
+            
         }
         panic!("there si no reqeust instance found for this servcie !")
     }

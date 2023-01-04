@@ -1,85 +1,51 @@
 use std::{sync::Arc};
 use std::cell::RefCell;
 use bitvec::prelude::*;
-use crate::data_type::{DiagCodedType, DataObjectProp, Structure, DynamicLengthField,Mux,EndOfPDUField, EnvDataDesc, StaticField, Reversed, MuxSwitch};
+use crate::data_type::{DiagCodedType, DataObjectProp, Structure, DynamicLengthField,Mux,EndOfPDUField, EnvDataDesc, StaticField, Reversed, MuxSwitch, DataTypeEnum};
 use marcolib::Instance;
 pub trait TDataInstance
 {
-  
-    fn is_high_low_byte_order(&self)->bool
-    {
-        unimplemented!();
-    }
-    fn update_data_instance(&mut self,bit_array:&BitVec)
-    {
-        unimplemented!();
-    }
-  
-    fn get_bit_length(&self)->usize
-    {
-        unimplemented!();
-    }
-    fn get_bit_position(&self)->usize
-    {
-        unimplemented!();
-    }
-    fn get_full_name(&self)->String
-    {
-        unimplemented!();
-    }
-
-    fn get_name(&self)->String
-    {
-        unimplemented!();
-    }
-
-
-    fn get_parameter_key(&self)->String
-    {
-        unimplemented!();
-        
-    }
-    fn reset(&self){
-        unimplemented!();
-    }
-    fn set_pending(&self,paramname:&str,pending_value:Vec<u8>)
-    {
-        unimplemented!();
-    }
-    fn get_current(&mut self,param_name:&str)->BitVec
-    {
-        unimplemented!();
-    }
-
-    fn get_parent(&self)->&Option<Arc<RefCell<dyn TDataInstance >>>
-    {
-        unimplemented!();
-    }
-    fn set_parent(&mut self,parent:Arc<RefCell<dyn TDataInstance>>)
-    {
-        unimplemented!();
-    }
-
+    fn is_high_low_byte_order(&self)->bool{return false;}
+    fn update_data_instance(&mut self,bit_array:&BitVec){unimplemented!()}
+    fn get_bit_length(&self)->usize{unimplemented!();}
+    fn get_bit_position(&self)->usize{unimplemented!();}
+    fn get_byte_position(&self)->usize{unimplemented!();}
+    fn get_full_name(&self)->String{unimplemented!();}
+    fn get_name(&self)->String{unimplemented!();}
+    fn reset(&mut self){unimplemented!();}
+    fn set_pending(&mut self,paramname:&str,pending_value:&BitVec){unimplemented!();}
+    fn get_current(&mut self,param_name:&str)->BitVec{unimplemented!();}
+    fn get_parent(&self)->&Option<Arc<RefCell<dyn TDataInstance >>>{unimplemented!();}
+    fn set_parent(&mut self,parent:Arc<RefCell<dyn TDataInstance>>){unimplemented!();}
 }
 
 
 #[derive(Default)]
 pub struct DataInstanceCore<T>
-{
+{  
+    // the name of the data instance 
     pub name:String,
-    pub byte_postiion:u32,
+    // the parent of this instance 
     pub parent:Option<Arc<RefCell<dyn TDataInstance>>>,
+    // the byte position in its parent structure 
+    pub byte_position:u32,
+    // the bit position in the byte position
     pub bit_position:u32,
+    // the bit length 
+    pub bit_length:u32,
+    // the data type reference
     pub datatype:Arc<RefCell<T>>,
     // for request data only
     pub pending_value:Option<BitVec<usize>>,
+    // for the default value of the instance
     pub nominal_value:Option<BitVec<usize>>,
-    // for response data only 
+    // for response data only, update_data_instance will update the current value 
     pub current_value:Option<BitVec<usize>>,
 }
 
 
-impl<T> TDataInstance for DataInstanceCore<T> {
+
+impl <T> TDataInstance for DataInstanceCore<T> {
 
     fn get_parent(&self)->&Option<Arc<RefCell<dyn TDataInstance >>>
     {
@@ -103,7 +69,7 @@ impl<T> TDataInstance for DataInstanceCore<T> {
 
     fn is_high_low_byte_order(&self)->bool
     {
-        return true;
+        return false;
     }
     fn update_data_instance(&mut self,bit_array:&BitVec)
     {
@@ -112,11 +78,15 @@ impl<T> TDataInstance for DataInstanceCore<T> {
   
     fn get_bit_length(&self)->usize
     {
-        return 0;
+        return self.bit_length as usize;
     }
     fn get_bit_position(&self)->usize
     {
         return self.bit_position as usize;
+    }    
+    fn get_byte_position(&self)->usize
+    {
+        return self.byte_position as usize;
     }
     fn get_full_name(&self)->String
     {
@@ -128,18 +98,15 @@ impl<T> TDataInstance for DataInstanceCore<T> {
         return self.name.clone();
     }
 
+    fn reset(&mut self){
+       self.current_value = Option::None;
+       self.pending_value = Option::None;
+       self.nominal_value = Option::None;
 
-    fn get_parameter_key(&self)->String
-    {
-        unimplemented!();
-        
     }
-    fn reset(&self){
-       
-    }
-    fn set_pending(&self,paramname:&str,pending_value:Vec<u8>)
+    fn set_pending(&mut self,paramname:&str,pending_value:&BitVec)
     {
-        unimplemented!();
+        self.pending_value = Some(pending_value.clone());
     }
 
 
@@ -152,6 +119,8 @@ pub struct CodedDataDataInstance
     pub coded_values:Vec<u32>
 
 }
+
+
 
 impl TDataInstance for CodedDataDataInstance
 {
@@ -171,6 +140,11 @@ impl TDataInstance for CodedDataDataInstance
     fn set_parent(&mut self,parent:Arc<RefCell<dyn TDataInstance>>)
     {
        self.instance_core.set_parent(parent)
+    }
+
+    fn set_pending(&mut self,paramname:&str,pending_value:&BitVec)
+    {
+       // don't do anything
     }
 }
 
@@ -198,6 +172,9 @@ pub struct DataObjectPropDataInstance
 {
     pub instance_core:DataInstanceCore<DataObjectProp>
 }
+
+
+
 
 impl TDataInstance for DataObjectPropDataInstance{
 
@@ -230,6 +207,15 @@ pub struct StaticFieldInstance
 }
 
 
+
+impl StaticFieldInstance {
+    fn get_element_name(&self)->String {
+        
+        return String::new();
+    }
+    
+}
+
 impl TDataInstance for StaticFieldInstance{
 
     fn get_parent(&self)->&Option<Arc<RefCell<dyn TDataInstance >>>
@@ -254,7 +240,7 @@ impl TDataInstance for StaticFieldInstance{
 }
 
 
-#[derive(Default,Instance)]
+#[derive(Default)]
 pub struct ReversedInstance
 { 
     pub instance_core:DataInstanceCore<Reversed>,
@@ -264,19 +250,34 @@ pub struct ReversedInstance
 
 
 
+impl TDataInstance for ReversedInstance{
 
-impl StaticFieldInstance {
-    fn get_element_name(&self)->String {
-        
-        return String::new();
+    fn get_parent(&self)->&Option<Arc<RefCell<dyn TDataInstance >>>
+    {
+        return &self.instance_core.get_parent();
     }
-    
+
+    fn set_parent(&mut self,parent:Arc<RefCell<dyn TDataInstance>>)
+    {
+       self.instance_core.set_parent(parent)
+    }
+
+   
+    fn get_full_name(&self)->String {
+        return self.instance_core.get_full_name();
+    }
 }
+
+
+
+
 #[derive(Default)]
 pub struct ListLengthInstance
 {
     pub instance_core:DataInstanceCore<u32>,
 }
+
+
 
 impl TDataInstance for  ListLengthInstance {
     
@@ -286,9 +287,12 @@ impl TDataInstance for  ListLengthInstance {
 pub struct DynamicLengthFieldInstance
 { 
     pub instance_core:DataInstanceCore<DynamicLengthField>,
-    pub children_instances:Vec<Arc<RefCell<dyn TDataInstance>>>,
-    
+    pub children_instances:Vec<Arc<RefCell<dyn TDataInstance>>>,    
 }
+
+
+
+
 
 impl TDataInstance for DynamicLengthFieldInstance{
 
@@ -373,6 +377,8 @@ pub struct EndOfPDUFieldInstance
     pub children_instances:Vec<Arc<RefCell<dyn TDataInstance>>>,
 }
 
+
+
 impl TDataInstance for EndOfPDUFieldInstance
 {
     fn update_data_instance(&mut self,bit_array:&BitVec)
@@ -436,10 +442,14 @@ pub struct EnvDataDescInstance
 
 
 
-#[derive(Default)]
-pub struct ServiceMessageInstance{
-    pub param_instances:Vec<Arc<RefCell<dyn TDataInstance>>>
+pub trait StructInstance {
+    fn as_struct(&self)->&StructureDataInstance;
+    fn as_mut_struct(& mut self)->&mut StructureDataInstance;
 }
+
+
+
+
 
 #[derive(Default)]
 pub struct StructureDataInstance
@@ -558,38 +568,39 @@ impl TDataInstance for StructureDataInstance
         
 
     }
-    fn reset(&self){
+    fn reset(& mut self){
         
         for instance in self.children_instances.iter()
         {
-            instance.as_ref().borrow().reset();
+            instance.as_ref().borrow_mut().reset();
         }
+        self.instance_core.reset();
     }
-    fn set_pending(&self,param:&str,pending_value:Vec<u8>)
+    fn set_pending(&mut self,param:&str,pending_value:&BitVec)
     {
         if param == ""
         {
-            let bit_vec:BitVec<u8,Lsb0>= BitVec::from_vec(pending_value);
+            //let bit_vec:BitVec<u8,Lsb0>= pending_value;
            for instance in self.children_instances.iter()
            {
-            let child_instance = instance.as_ref().borrow_mut();
+            let mut child_instance = instance.as_ref().borrow_mut();
             let bit_position = child_instance.get_bit_position();
             let bit_length = child_instance.get_bit_length();
-            let bit_vec_slice = &bit_vec[bit_position..=bit_position+bit_length];
+            let bit_vec_slice = &pending_value[bit_position..=bit_position+bit_length];
             let child_bitvec = BitVec::from_bitslice(bit_vec_slice);
-            child_instance.set_pending("", child_bitvec.into_vec());
+            child_instance.set_pending("", &child_bitvec);
            }
         }
         else {
            let mut paths:Vec<&str> =  param.split(".").collect();
            let header = paths[0];
-           for child_instance in self.children_instances.iter()
+           for child_instance in self.children_instances.iter_mut()
            {
             if header ==  child_instance.as_ref().borrow().get_name()
             {
                 let remainder_string = paths.join(".");
                 paths.remove(0);
-                child_instance.as_ref().borrow().set_pending(remainder_string.as_str(), pending_value);
+                child_instance.as_ref().borrow_mut().set_pending(remainder_string.as_str(), pending_value);
                 break;
             }
            
@@ -615,10 +626,39 @@ impl TDataInstance for StructureDataInstance
 
 }
 
+
+#[derive(Default)]
+
+pub struct ServiceMessageInstance {
+    pub short_name:String,
+    pub long_name:Option<String>,
+    pub id:String,
+    //pub param_instances:Vec<Arc<RefCell<dyn TDataInstance>>>,
+    pub struct_data_instance:StructureDataInstance
+
+}
+
+impl StructInstance for ServiceMessageInstance {
+    fn as_struct(&self)->&StructureDataInstance
+    {
+        return &self.struct_data_instance;
+    }
+    fn as_mut_struct(& mut self)->&mut StructureDataInstance
+    {
+        return &mut self.struct_data_instance;
+
+    }
+    
+}
+
+
+
+
 #[derive(Default)]
 pub struct DiagServiceInstance
 {
+    pub diag_service_name:String,
     pub request_instance:ServiceMessageInstance,
-    pub positive_response_instance:ServiceMessageInstance,
-    pub negative_response_instance:ServiceMessageInstance,
+    pub positive_response_instance:Option<ServiceMessageInstance>,
+    pub negative_response_instance:Option<ServiceMessageInstance>,
 } 

@@ -10,6 +10,7 @@ mod tests {
     use crate::{data_type::{Structure, ServiceMsgType}, data_instance::{DiagServiceInstance, ServiceMessageInstance, StructureDataInstance, DataInstanceCore, StructInstance,TDataInstance}};
     use bitvec::{prelude::*, view::BitView};
     use super::*;
+    use data_instance::*;
     use std::sync::Arc;
 
     #[test]
@@ -36,15 +37,20 @@ mod tests {
 
     #[test]
     fn test_end_of_pdu() {
-        let odxpath = r"D:\Workspace\RustApp\odxparser\odxparserlib\src\CN180S_V1.0.80.odx";
+       // let odxpath = r"D:\Workspace\RustApp\odxparser\odxparserlib\src\CN180S_V1.0.80.odx";
         
-        //let odxpath = r"E:\WORKSPACE\RustApps\odx_parser\odxparserlib\src\CN180S_V1.0.80.odx";
+        let odxpath = r"E:\WORKSPACE\RustApps\odx_parser\odxparserlib\src\CN180S_V1.0.80.odx";
         let mut parser = parser::ODXParser::new();
         parser.parse(odxpath); 
         //let pos_service_instance = service_instance.positive_response_instance.as_ref().unwrap();
-        let data  = [0xA5];
+        let data  = [1,1,1,1];
         let pending_value = data.view_bits::<Lsb0>();
-        parser.set_pending("RQ_FaultMemory_Read_identified_errors.DtcStatusbyte_STRUCTURE",&BitVec::from_bitslice(pending_value) );
+        let r = &pending_value[0..9];
+        
+        let bv = BitVecU8::from_bitslice(r);
+        let s = bv.as_raw_slice();
+        
+        parser.set_pending("RQ_FaultMemory_Read_identified_errors.DtcStatusbyte_STRUCTURE",&BitVecU8::from_bitslice(pending_value) );
         let service_instance = parser.get_diag_service_instance("CN180S_PEPS", "FaultMemory_Read_identified_errors");
         let request_instance = &service_instance.request_instance;
         for instance in request_instance.as_ref().borrow().as_struct().children_instances.iter()

@@ -103,7 +103,7 @@ impl<'b> ODXParser
     }
 
 
-    pub fn set_pending(&mut self,param:&str,pending_value:&BitVec)
+    pub fn set_pending(&mut self,param:&str,pending_value:&BitVecU8)
     {
         let dot_index = param.find(".");
         match dot_index
@@ -519,12 +519,12 @@ impl<'b> ODXParser
         let phys_constant_value = self.__get_descendantText(node, "PHYS-CONSTANT-VALUE");
         let aatype = node.attribute("AA:type").map(|s|String::from(s));
         let sematic = node.attribute("SEMANTIC").map(|s|String::from(s));
-        let mut codevalues = Vec::<usize>::new();
+        let mut codevalues = Vec::<u32>::new();
         for n in  node.descendants()
         {
            if n.tag_name().name() == "CODED-VALUE"
            {
-            let codevalue = n.text().unwrap().parse::<usize>().unwrap();
+            let codevalue = n.text().unwrap().parse::<u32>().unwrap();
             codevalues.push(codevalue);
            }
 

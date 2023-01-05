@@ -7,7 +7,7 @@ use std::cell::{RefCell, Ref};
 
 pub trait DataType{
     type InstanceType;
-    fn create_instance(datatype:Arc<RefCell<Self>>,name:&str,byte_postion:u32,bit_position:u32)->Arc<RefCell<Self::InstanceType>>;
+    fn create_instance(datatype:Arc<RefCell<Self>>,name:&str,byte_postion:u32,bit_position:u32,bit_length:Option<u32>)->Arc<RefCell<Self::InstanceType>>;
     fn is_high_low_byte_order(&self)->bool
     {return false;}
 
@@ -113,30 +113,30 @@ pub enum DataTypeEnum
 
 impl DataTypeEnum
 {
-    pub fn create_data_instance(&self,name:&str,byte_postion:u32,bit_position:u32)->Arc<RefCell<dyn TDataInstance>>
+    pub fn create_data_instance(&self,name:&str,byte_postion:u32,bit_position:u32,bit_length:Option<u32>)->Arc<RefCell<dyn TDataInstance>>
     {
         match self
         {
             DataTypeEnum::STRUCTURE(p)=>{
-            let instance = Structure::create_instance(p.clone(), name, byte_postion, bit_position);
+            let instance = Structure::create_instance(p.clone(), name, byte_postion, bit_position,bit_length);
             return instance;
 
             }
             DataTypeEnum::DATA_OBJECT_PROP(p)=>{
-                let instance = DataObjectProp::create_instance(p.clone(), name, byte_postion, bit_position);
+                let instance = DataObjectProp::create_instance(p.clone(), name, byte_postion, bit_position,bit_length);
                 return instance;
             }
             DataTypeEnum::STATIC_FIELD(p)=>{
-                let instance = StaticField::create_instance(p.clone(), name, byte_postion, bit_position);
+                let instance = StaticField::create_instance(p.clone(), name, byte_postion, bit_position,bit_length);
                 return instance;
             }
             DataTypeEnum::END_OF_PDU_FIELD(p)=>{
-                let instance = EndOfPDUField::create_instance(p.clone(), name, byte_postion, bit_position);
+                let instance = EndOfPDUField::create_instance(p.clone(), name, byte_postion, bit_position,bit_length);
                 return instance;
 
             }
             DataTypeEnum::DYNAMIC_FIELD(p)=>{
-                let instance = DynamicLengthField::create_instance(p.clone(), name, byte_postion, bit_position);
+                let instance = DynamicLengthField::create_instance(p.clone(), name, byte_postion, bit_position,bit_length);
                 return instance;
 
             }
@@ -179,7 +179,7 @@ pub struct Param
 {
     pub shortname:String,
     pub longname:Option<String>,
-    pub codedvalues:Vec<usize>,
+    pub codedvalues:Vec<u32>,
     pub dop_ref:Option<String>,
     pub byte_position:Option<u32>,
     pub bit_position:Option<u32>,
@@ -214,7 +214,7 @@ impl Param {
             if let Some(p) = &self.diag_coded_type
             {
                 
-                let mut coded_type_instance =  DiagCodedType::create_instance(p.clone(), name, byte_position, bit_position);
+                let mut coded_type_instance =  DiagCodedType::create_instance(p.clone(), name, byte_position, bit_position,self.bit_length);
                
                 coded_type_instance.as_ref().borrow_mut().coded_values = self.codedvalues.clone();
                
@@ -224,7 +224,7 @@ impl Param {
 
                 if let Some(p) = &self.reversed
                 {
-                    return Reversed::create_instance(p.clone(), name, byte_position, bit_position)
+                    return Reversed::create_instance(p.clone(), name, byte_position, bit_position,self.bit_length)
                 }
                 panic!("The ref is None and it is not diag coded type is not invalid mode");
             }
@@ -232,36 +232,36 @@ impl Param {
 
         else if let Some(p) = variantref.data_object_props.get(self.dop_ref.as_ref().unwrap())
         {
-           DataObjectProp::create_instance(p.clone(), name, byte_position, bit_position)
+           DataObjectProp::create_instance(p.clone(), name, byte_position, bit_position,self.bit_length)
            
         }
         else if let Some(p) =variantref.structures.get(self.dop_ref.as_ref().unwrap())
         {
-            Structure::create_instance(p.clone(), name, byte_position, bit_position)
+            Structure::create_instance(p.clone(), name, byte_position, bit_position,self.bit_length)
             
         }
         else if let Some(p) =variantref.static_fileds.get(self.dop_ref.as_ref().unwrap())
         {
-            StaticField::create_instance(p.clone(), name, byte_position, bit_position)
+            StaticField::create_instance(p.clone(), name, byte_position, bit_position,self.bit_length)
             
         }
       
         else if let Some(p) =variantref.env_data_descs.get(self.dop_ref.as_ref().unwrap())
         {
-            EnvDataDesc::create_instance(p.clone(), name, byte_position, bit_position)
+            EnvDataDesc::create_instance(p.clone(), name, byte_position, bit_position,self.bit_length)
       
         }
         else if let Some(p) =variantref.dynamic_fileds.get(self.dop_ref.as_ref().unwrap())
         {
-            DynamicLengthField::create_instance(p.clone(), name, byte_position, bit_position)
+            DynamicLengthField::create_instance(p.clone(), name, byte_position, bit_position,self.bit_length)
         }
         else if let Some(p) =variantref.endofpdu_fileds.get(self.dop_ref.as_ref().unwrap())
         {
-            EndOfPDUField::create_instance(p.clone(), name, byte_position, bit_position)
+            EndOfPDUField::create_instance(p.clone(), name, byte_position, bit_position,self.bit_length)
         }
         else if let Some(p) =variantref.muxs.get(self.dop_ref.as_ref().unwrap())
         {
-            Mux::create_instance(p.clone(), name, byte_position, bit_position)
+            Mux::create_instance(p.clone(), name, byte_position, bit_position,self.bit_length)
         }
         else {
             panic!("")
@@ -305,7 +305,7 @@ pub struct DiagCodedType
 impl DataType for DiagCodedType
 {
     type InstanceType = CodedDataDataInstance ;
-    fn create_instance(datatype:Arc<RefCell<DiagCodedType>>,name:&str,byte_position:u32,bit_position:u32)->Arc<RefCell<CodedDataDataInstance>>
+    fn create_instance(datatype:Arc<RefCell<DiagCodedType>>,name:&str,byte_position:u32,bit_position:u32,bit_length:Option<u32>)->Arc<RefCell<CodedDataDataInstance>>
     {
         let di =  CodedDataDataInstance{
             instance_core:DataInstanceCore{datatype:datatype ,name:String::from(name),bit_position:bit_position,byte_position,..Default::default()},
@@ -361,7 +361,7 @@ impl DataObjectProp {
 impl DataType for DataObjectProp
 {
     type InstanceType = DataObjectPropDataInstance;
-    fn create_instance(datatype:Arc<RefCell<DataObjectProp>>,name:&str,byte_position:u32,bit_position:u32)->Arc<RefCell<DataObjectPropDataInstance>>
+    fn create_instance(datatype:Arc<RefCell<DataObjectProp>>,name:&str,byte_position:u32,bit_position:u32,bit_length:Option<u32>)->Arc<RefCell<DataObjectPropDataInstance>>
     {
         let di =  DataObjectPropDataInstance{
             instance_core:DataInstanceCore{datatype:datatype ,name:String::from(name),bit_position:bit_position,byte_position,..Default::default()},
@@ -387,7 +387,7 @@ pub struct Structure
 impl DataType for Structure {
    
     type InstanceType = StructureDataInstance;
-    fn create_instance(datatype:Arc<RefCell<Structure>>,name:&str,byte_position:u32,bit_position:u32)->Arc<RefCell<StructureDataInstance>>
+    fn create_instance(datatype:Arc<RefCell<Structure>>,name:&str,byte_position:u32,bit_position:u32,bit_length:Option<u32>)->Arc<RefCell<StructureDataInstance>>
     {
         let dt = datatype.clone();
         let mut di =  Arc::new(RefCell::new(StructureDataInstance{
@@ -421,7 +421,7 @@ pub struct EnvDataDesc{
 impl DataType for EnvDataDesc
 {
     type InstanceType = EnvDataDescInstance;
-    fn create_instance(datatype:Arc<RefCell<EnvDataDesc>>,name:&str,byte_position:u32,bit_position:u32)->Arc<RefCell<EnvDataDescInstance>>
+    fn create_instance(datatype:Arc<RefCell<EnvDataDesc>>,name:&str,byte_position:u32,bit_position:u32,bit_length:Option<u32>)->Arc<RefCell<EnvDataDescInstance>>
     {
         let di =  EnvDataDescInstance{
             instance_core:DataInstanceCore{datatype:datatype ,name:String::from(name),bit_position:bit_position,byte_position,..Default::default()},
@@ -439,10 +439,10 @@ pub struct Reversed
 
 impl DataType for Reversed {
     type InstanceType = ReversedInstance;
-    fn create_instance(datatype:Arc<RefCell<Reversed>>,name:&str,byte_position:u32,bit_position:u32)->Arc<RefCell<ReversedInstance>>
+    fn create_instance(datatype:Arc<RefCell<Reversed>>,name:&str,byte_position:u32,bit_position:u32,bit_length:Option<u32>)->Arc<RefCell<ReversedInstance>>
     {
         let di =  ReversedInstance{
-            instance_core:DataInstanceCore{datatype:datatype ,name:String::from(name),bit_position:bit_position,byte_position:byte_position,..Default::default()},
+            instance_core:DataInstanceCore{datatype:datatype ,name:String::from(name),bit_position:bit_position,byte_position:byte_position,bit_length:bit_length.unwrap(),..Default::default()},
         };
         return Arc::new(RefCell::new(di));
 
@@ -485,7 +485,7 @@ pub struct EndOfPDUField
 
 impl  EndOfPDUField
 {
-    fn create_instance(datatype:Arc<RefCell<EndOfPDUField>>,name:&str,byte_position:u32,bit_position:u32)->Arc<RefCell<EndOfPDUFieldInstance>>
+    fn create_instance(datatype:Arc<RefCell<EndOfPDUField>>,name:&str,byte_position:u32,bit_position:u32,bit_length:Option<u32>)->Arc<RefCell<EndOfPDUFieldInstance>>
     {
         let di =  EndOfPDUFieldInstance{
             instance_core:DataInstanceCore{datatype:datatype ,name:String::from(name),bit_position:bit_position,byte_position:byte_position,..Default::default()},
@@ -513,7 +513,7 @@ pub struct Mux
 
 
 impl Mux {
-    fn create_instance(datatype:Arc<RefCell<Mux>>,name:&str,byte_position:u32,bit_position:u32)->Arc<RefCell<MuxInstance>>
+    fn create_instance(datatype:Arc<RefCell<Mux>>,name:&str,byte_position:u32,bit_position:u32,bit_length:Option<u32>)->Arc<RefCell<MuxInstance>>
     {
 
         let mut di =  MuxInstance{
@@ -527,7 +527,7 @@ impl Mux {
             let case_type_ref = case_instance.ref_structure_id.as_ref().unwrap().as_str();
            
             let case_data_type = variant_ref.get_data_type_by_ref_id(case_type_ref).unwrap();
-            di.children_case_instances.push(case_data_type.create_data_instance(name, byte_position, bit_position));
+            di.children_case_instances.push(case_data_type.create_data_instance(name, byte_position, bit_position,Option::None));
         }
 
         
@@ -535,7 +535,7 @@ impl Mux {
         let byte_position = datatype_ref.switch_key.byte_position.unwrap();
         let bit_position = datatype_ref.switch_key.bit_position.unwrap_or_default();
         let switch_datatype = switch_data_type.as_ref().unwrap();
-        di.mux_switch_case_instance = Some(switch_datatype.create_data_instance("key",byte_position, bit_position));
+        di.mux_switch_case_instance = Some(switch_datatype.create_data_instance("key",byte_position, bit_position,Option::None));
         
         
         let default_case_data_type = variant_ref.get_data_type_by_ref_id(datatype_ref.default_case.as_ref().unwrap().ref_structure_id.as_ref().unwrap()).unwrap();
@@ -562,7 +562,7 @@ pub struct StaticField
 impl DataType for StaticField
 {
     type InstanceType = StaticFieldInstance;
-    fn create_instance(datatype:Arc<RefCell<StaticField>>,name:&str,byte_position:u32,bit_position:u32)->Arc<RefCell<StaticFieldInstance>>
+    fn create_instance(datatype:Arc<RefCell<StaticField>>,name:&str,byte_position:u32,bit_position:u32,bit_length:Option<u32>)->Arc<RefCell<StaticFieldInstance>>
     {
         let datatype_ref = datatype.clone();
         let vv = (&datatype_ref).as_ref().borrow();
@@ -578,7 +578,7 @@ impl DataType for StaticField
             let itemname = format!("{}[{}]",name,item);
             let ref_id = vv.ref_struct_id.as_ref();
             let itemdatatype = variant_ref.as_ref().borrow().get_data_type_by_ref_id(ref_id.unwrap().as_str());
-            di.children_instances.push(itemdatatype.as_ref().unwrap().create_data_instance(itemname.as_str(), byte_position, 0));
+            di.children_instances.push(itemdatatype.as_ref().unwrap().create_data_instance(itemname.as_str(), byte_position, 0,Option::None));
             byte_position+=vv.item_size.as_ref().unwrap();
 
         }
@@ -599,7 +599,7 @@ pub struct DynamicLengthField
 }
 
 impl DynamicLengthField {
-    fn create_instance(datatype:Arc<RefCell<DynamicLengthField>>,name:&str,byte_position:u32,bit_position:u32)->Arc<RefCell<DynamicLengthFieldInstance>>
+    fn create_instance(datatype:Arc<RefCell<DynamicLengthField>>,name:&str,byte_position:u32,bit_position:u32,bit_length:Option<u32>)->Arc<RefCell<DynamicLengthFieldInstance>>
     {
         let datatype_ref = datatype.clone();
         let vv = (&datatype_ref).as_ref().borrow();
@@ -614,7 +614,7 @@ impl DynamicLengthField {
             instance_core:DataInstanceCore{datatype:Arc::new(RefCell::new(0)) ,name:String::from("Length"),..Default::default()}
         };
         let itemdatatype = variant_ref.as_ref().borrow().get_data_type_by_ref_id(ref_id.unwrap().as_str());
-        let item_instance = itemdatatype.as_ref().unwrap().create_data_instance(format!("{}[i]",name).as_str(), 0, 0);
+        let item_instance = itemdatatype.as_ref().unwrap().create_data_instance(format!("{}[i]",name).as_str(), 0, 0,Option::None);
         di.children_instances.push(Arc::new(RefCell::new(length_instance)));
         di.children_instances.push(item_instance);
         return Arc::new(RefCell::new(di));

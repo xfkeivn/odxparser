@@ -2,20 +2,20 @@ use std::{sync::Arc};
 use std::cell::RefCell;
 use bitvec::prelude::*;
 use crate::data_type::{DiagCodedType, DataObjectProp, Structure, DynamicLengthField,Mux,EndOfPDUField, EnvDataDesc, StaticField, Reversed, MuxSwitch, DataTypeEnum};
-use marcolib::Instance;
+pub type BitVecU8 = BitVec<u8,Lsb0>; 
 pub trait TDataInstance
 {
     fn is_high_low_byte_order(&self)->bool{return false;}
-    fn update_data_instance(&mut self,bit_array:&BitVec);
+    fn update_data_instance(&mut self,bit_array:&BitVecU8);
     fn get_bit_length(&self)->usize;
     fn get_bit_position(&self)->usize;
     fn get_byte_position(&self)->usize;
     fn get_full_name(&self)->String;
     fn get_name(&self)->String;
     fn reset(&mut self);
-    fn get_pending(&self)->Option<BitVec>;
-    fn set_pending(&mut self,paramname:&str,pending_value:&BitVec);
-    fn get_current(&mut self,param_name:&str)->BitVec;
+    fn get_pending(&self)->Option<BitVecU8>;
+    fn set_pending(&mut self,paramname:&str,pending_value:&BitVecU8);
+    fn get_current(&mut self,param_name:&str)->BitVecU8;
     fn get_parent(&self)->&Option<Arc<RefCell<dyn TDataInstance >>>;
     fn set_parent(&mut self,parent:Arc<RefCell<dyn TDataInstance>>);
     fn get_children(&self)->Option<Vec<Arc<RefCell<dyn TDataInstance>>>>;
@@ -38,11 +38,11 @@ pub struct DataInstanceCore<T>
     // the data type reference
     pub datatype:Arc<RefCell<T>>,
     // for request data only
-    pub pending_value:Option<BitVec<usize>>,
+    pub pending_value:Option<BitVecU8>,
     // for the default value of the instance
-    pub nominal_value:Option<BitVec<usize>>,
+    pub nominal_value:Option<BitVecU8>,
     // for response data only, update_data_instance will update the current value 
-    pub current_value:Option<BitVec<usize>>,
+    pub current_value:Option<BitVecU8>,
 }
 
 
@@ -58,7 +58,7 @@ impl <T> TDataInstance for DataInstanceCore<T> {
     {
        self.parent = Some(parent);
     }
-    fn get_current(&mut self,param_name:&str)->BitVec
+    fn get_current(&mut self,param_name:&str)->BitVecU8
         {
         if param_name!=""
         {
@@ -73,7 +73,7 @@ impl <T> TDataInstance for DataInstanceCore<T> {
     {
         return false;
     }
-    fn update_data_instance(&mut self,bit_array:&BitVec)
+    fn update_data_instance(&mut self,bit_array:&BitVecU8)
     {
         self.current_value = Some(bit_array.clone());
     }
@@ -106,11 +106,11 @@ impl <T> TDataInstance for DataInstanceCore<T> {
        self.nominal_value = Option::None;
 
     }
-    fn set_pending(&mut self,paramname:&str,pending_value:&BitVec)
+    fn set_pending(&mut self,paramname:&str,pending_value:&BitVec<u8,Lsb0>)
     {
         self.pending_value = Some(pending_value.clone());
     }
-    fn get_pending(&self)->Option<BitVec> {
+    fn get_pending(&self)->Option<BitVec<u8,Lsb0>> {
         return self.pending_value.clone();
     }
     fn get_children(&self)->Option<Vec<Arc<RefCell<dyn TDataInstance>>>> {
@@ -124,7 +124,7 @@ impl <T> TDataInstance for DataInstanceCore<T> {
 pub struct CodedDataDataInstance
 {
     pub instance_core:DataInstanceCore<DiagCodedType>,
-    pub coded_values:Vec<usize>
+    pub coded_values:Vec<u32>
 
 }
 
@@ -148,12 +148,13 @@ impl TDataInstance for CodedDataDataInstance
        self.instance_core.set_parent(parent)
     }
 
-    fn set_pending(&mut self,paramname:&str,pending_value:&BitVec)
+    fn set_pending(&mut self,paramname:&str,pending_value:&BitVec<u8,Lsb0>)
     {
        // don't do anything
     }
-    fn get_pending(&self)->Option<BitVec> {
-        return self.coded_values.first().map(|value|BitVec::from_element(value.clone()));
+    fn get_pending(&self)->Option<BitVec<u8,Lsb0>> {
+
+        return self.coded_values.first().map(|value|BitVecU8::from_vec(value.clone().to_be_bytes().to_vec()));
     }
     fn get_name(&self)->String {
         return self.instance_core.get_name();
@@ -167,10 +168,10 @@ impl TDataInstance for CodedDataDataInstance
     fn get_byte_position(&self)->usize {
         self.instance_core.get_byte_position()
     }
-    fn get_current(&mut self,param_name:&str)->BitVec {
+    fn get_current(&mut self,param_name:&str)->BitVec<u8,Lsb0> {
         self.instance_core.get_current(param_name)
     }
-    fn update_data_instance(&mut self,bit_array:&BitVec) {
+    fn update_data_instance(&mut self,bit_array:&BitVec<u8,Lsb0>) {
         // the coded value cannot be updated 
         //self.instance_core.update_data_instance(bit_array)
     }
@@ -227,7 +228,7 @@ impl TDataInstance for DataObjectPropDataInstance{
     fn get_full_name(&self)->String {
         return self.instance_core.get_full_name();
     }
-    fn get_pending(&self)->Option<BitVec> {
+    fn get_pending(&self)->Option<BitVec<u8,Lsb0>> {
         return self.instance_core.get_pending();
     }
     fn get_bit_position(&self)->usize {
@@ -236,7 +237,7 @@ impl TDataInstance for DataObjectPropDataInstance{
     fn get_byte_position(&self)->usize {
         self.instance_core.get_byte_position()
     }
-    fn get_current(&mut self,param_name:&str)->BitVec {
+    fn get_current(&mut self,param_name:&str)->BitVec<u8,Lsb0> {
         self.instance_core.get_current(param_name)
     }
     fn get_name(&self)->String {
@@ -245,10 +246,10 @@ impl TDataInstance for DataObjectPropDataInstance{
     fn reset(&mut self) {
         self.instance_core.reset()
     }
-    fn set_pending(&mut self,paramname:&str,pending_value:&BitVec) {
+    fn set_pending(&mut self,paramname:&str,pending_value:&BitVec<u8,Lsb0>) {
         self.instance_core.set_pending(paramname, pending_value)
     }
-    fn update_data_instance(&mut self,bit_array:&BitVec) {
+    fn update_data_instance(&mut self,bit_array:&BitVec<u8,Lsb0>) {
         
     }
     fn get_children(&self)->Option<Vec<Arc<RefCell<dyn TDataInstance>>>> {
@@ -295,7 +296,7 @@ impl TDataInstance for StaticFieldInstance{
     fn get_full_name(&self)->String {
         return self.instance_core.get_full_name();
     }
-    fn get_pending(&self)->Option<BitVec> {
+    fn get_pending(&self)->Option<BitVec<u8,Lsb0>> {
         return self.instance_core.get_pending();
     }
     fn get_bit_position(&self)->usize {
@@ -304,7 +305,7 @@ impl TDataInstance for StaticFieldInstance{
     fn get_byte_position(&self)->usize {
         self.instance_core.get_byte_position()
     }
-    fn get_current(&mut self,param_name:&str)->BitVec {
+    fn get_current(&mut self,param_name:&str)->BitVec<u8,Lsb0> {
         self.instance_core.get_current(param_name)
     }
     fn reset(&mut self) {
@@ -313,11 +314,11 @@ impl TDataInstance for StaticFieldInstance{
     fn get_name(&self)->String {
         self.instance_core.get_name()
     }
-    fn update_data_instance(&mut self,bit_array:&BitVec) {
+    fn update_data_instance(&mut self,bit_array:&BitVec<u8,Lsb0>) {
         self.instance_core.update_data_instance(bit_array)
 
     }
-    fn set_pending(&mut self,paramname:&str,pending_value:&BitVec) {
+    fn set_pending(&mut self,paramname:&str,pending_value:&BitVec<u8,Lsb0>) {
         self.instance_core.set_pending(paramname, pending_value)
     }
     fn get_children(&self)->Option<Vec<Arc<RefCell<dyn TDataInstance>>>> {
@@ -350,7 +351,7 @@ impl TDataInstance for ReversedInstance{
     fn get_full_name(&self)->String {
         return self.instance_core.get_full_name();
     }
-    fn get_pending(&self)->Option<BitVec> {
+    fn get_pending(&self)->Option<BitVec<u8,Lsb0>> {
         return self.instance_core.get_pending();
     }
     fn get_bit_length(&self)->usize {
@@ -362,7 +363,7 @@ impl TDataInstance for ReversedInstance{
     fn get_bit_position(&self)->usize {
         self.instance_core.get_bit_position()
     }
-    fn get_current(&mut self,param_name:&str)->BitVec {
+    fn get_current(&mut self,param_name:&str)->BitVec<u8,Lsb0> {
         self.instance_core.get_current(param_name)
     }
     fn get_name(&self)->String {
@@ -371,10 +372,10 @@ impl TDataInstance for ReversedInstance{
     fn reset(&mut self) {
         self.instance_core.reset()
     }
-    fn set_pending(&mut self,paramname:&str,pending_value:&BitVec) {
+    fn set_pending(&mut self,paramname:&str,pending_value:&BitVec<u8,Lsb0>) {
         self.instance_core.set_pending(paramname, pending_value)
     }
-    fn update_data_instance(&mut self,bit_array:&BitVec) {
+    fn update_data_instance(&mut self,bit_array:&BitVec<u8,Lsb0>) {
         self.instance_core.update_data_instance(bit_array)
     }
     fn get_children(&self)->Option<Vec<Arc<RefCell<dyn TDataInstance>>>> {
@@ -408,7 +409,7 @@ impl TDataInstance for  ListLengthInstance {
     fn get_full_name(&self)->String {
         return self.instance_core.get_full_name();
     }
-    fn get_pending(&self)->Option<BitVec> {
+    fn get_pending(&self)->Option<BitVec<u8,Lsb0>> {
         return self.instance_core.get_pending();
     }
     fn get_bit_length(&self)->usize {
@@ -420,7 +421,7 @@ impl TDataInstance for  ListLengthInstance {
     fn get_bit_position(&self)->usize {
         self.instance_core.get_bit_position()
     }
-    fn get_current(&mut self,param_name:&str)->BitVec {
+    fn get_current(&mut self,param_name:&str)->BitVec<u8,Lsb0> {
         self.instance_core.get_current(param_name)
     }
     fn get_name(&self)->String {
@@ -429,10 +430,10 @@ impl TDataInstance for  ListLengthInstance {
     fn reset(&mut self) {
         self.instance_core.reset()
     }
-    fn set_pending(&mut self,paramname:&str,pending_value:&BitVec) {
+    fn set_pending(&mut self,paramname:&str,pending_value:&BitVec<u8,Lsb0>) {
         self.instance_core.set_pending(paramname, pending_value)
     }
-    fn update_data_instance(&mut self,bit_array:&BitVec) {
+    fn update_data_instance(&mut self,bit_array:&BitVec<u8,Lsb0>) {
         self.instance_core.update_data_instance(bit_array)
     }
     fn get_children(&self)->Option<Vec<Arc<RefCell<dyn TDataInstance>>>> {
@@ -476,7 +477,7 @@ impl TDataInstance for DynamicLengthFieldInstance{
     fn get_full_name(&self)->String {
         return self.instance_core.get_full_name();
     }
-    fn get_pending(&self)->Option<BitVec> {
+    fn get_pending(&self)->Option<BitVecU8> {
         return self.instance_core.get_pending();
     }
     fn get_byte_position(&self)->usize {
@@ -485,7 +486,7 @@ impl TDataInstance for DynamicLengthFieldInstance{
     fn get_bit_position(&self)->usize {
         self.instance_core.get_bit_position()
     }
-    fn get_current(&mut self,param_name:&str)->BitVec {
+    fn get_current(&mut self,param_name:&str)->BitVecU8 {
         self.instance_core.get_current(param_name)
     }
     fn get_name(&self)->String {
@@ -494,10 +495,10 @@ impl TDataInstance for DynamicLengthFieldInstance{
     fn reset(&mut self) {
         self.instance_core.reset()
     }
-    fn set_pending(&mut self,paramname:&str,pending_value:&BitVec) {
+    fn set_pending(&mut self,paramname:&str,pending_value:&BitVecU8) {
         self.instance_core.set_pending(paramname, pending_value)
     }
-    fn update_data_instance(&mut self,bit_array:&BitVec) {
+    fn update_data_instance(&mut self,bit_array:&BitVecU8) {
         self.instance_core.update_data_instance(bit_array)
     }
     fn get_children(&self)->Option<Vec<Arc<RefCell<dyn TDataInstance>>>> {
@@ -550,7 +551,7 @@ impl TDataInstance for MuxInstance{
     fn get_full_name(&self)->String {
         return self.instance_core.get_full_name();
     }
-    fn get_pending(&self)->Option<BitVec> {
+    fn get_pending(&self)->Option<BitVecU8> {
         return self.instance_core.get_pending();
     }
     fn get_byte_position(&self)->usize {
@@ -559,7 +560,7 @@ impl TDataInstance for MuxInstance{
     fn get_bit_position(&self)->usize {
         self.instance_core.get_bit_position()
     }
-    fn get_current(&mut self,param_name:&str)->BitVec {
+    fn get_current(&mut self,param_name:&str)->BitVecU8 {
         self.instance_core.get_current(param_name)
     }
     fn get_name(&self)->String {
@@ -568,10 +569,10 @@ impl TDataInstance for MuxInstance{
     fn reset(&mut self) {
         self.instance_core.reset()
     }
-    fn set_pending(&mut self,paramname:&str,pending_value:&BitVec) {
+    fn set_pending(&mut self,paramname:&str,pending_value:&BitVecU8) {
         self.instance_core.set_pending(paramname, pending_value)
     }
-    fn update_data_instance(&mut self,bit_array:&BitVec) {
+    fn update_data_instance(&mut self,bit_array:&BitVecU8) {
         self.instance_core.update_data_instance(bit_array)
     }
     fn get_children(&self)->Option<Vec<Arc<RefCell<dyn TDataInstance>>>> {
@@ -592,7 +593,7 @@ pub struct EndOfPDUFieldInstance
 
 impl TDataInstance for EndOfPDUFieldInstance
 {
-    fn update_data_instance(&mut self,bit_array:&BitVec)
+    fn update_data_instance(&mut self,bit_array:&BitVecU8)
     {
         let mut current_pos = 0;
         let index = 0;
@@ -606,7 +607,7 @@ impl TDataInstance for EndOfPDUFieldInstance
         {
            let name = format!("[{}]",index);
            let name =  self.instance_core.name.as_str();
-           let ci = child_datatype.as_ref().unwrap().create_data_instance(name, 0, current_pos as u32);
+           let ci = child_datatype.as_ref().unwrap().create_data_instance(name, 0, current_pos as u32,Option::None);
            let childbitlen = ci.as_ref().borrow().get_bit_length();
            self.children_instances.push(ci);
            current_pos+=childbitlen;
@@ -640,7 +641,7 @@ impl TDataInstance for EndOfPDUFieldInstance
     fn get_full_name(&self)->String {
         return self.instance_core.get_full_name();
     }
-    fn get_pending(&self)->Option<BitVec> {
+    fn get_pending(&self)->Option<BitVecU8> {
         return self.instance_core.get_pending();
     }
 
@@ -650,7 +651,7 @@ impl TDataInstance for EndOfPDUFieldInstance
     fn get_bit_position(&self)->usize {
         self.instance_core.get_bit_position()
     }
-    fn get_current(&mut self,param_name:&str)->BitVec {
+    fn get_current(&mut self,param_name:&str)->BitVecU8 {
         self.instance_core.get_current(param_name)
     }
     fn get_name(&self)->String {
@@ -659,7 +660,7 @@ impl TDataInstance for EndOfPDUFieldInstance
     fn reset(&mut self) {
         self.instance_core.reset()
     }
-    fn set_pending(&mut self,paramname:&str,pending_value:&BitVec) {
+    fn set_pending(&mut self,paramname:&str,pending_value:&BitVecU8) {
         self.instance_core.set_pending(paramname, pending_value)
     }
     fn get_children(&self)->Option<Vec<Arc<RefCell<dyn TDataInstance>>>> {
@@ -679,7 +680,7 @@ pub struct EnvDataDescInstance
 
 
 impl TDataInstance for EnvDataDescInstance {
-    fn get_pending(&self)->Option<BitVec> {
+    fn get_pending(&self)->Option<BitVecU8> {
         return self.instance_core.get_pending();
     }
     fn get_parent(&self)->&Option<Arc<RefCell<dyn TDataInstance >>>
@@ -706,7 +707,7 @@ impl TDataInstance for EnvDataDescInstance {
     fn get_bit_position(&self)->usize {
         self.instance_core.get_bit_position()
     }
-    fn get_current(&mut self,param_name:&str)->BitVec {
+    fn get_current(&mut self,param_name:&str)->BitVecU8 {
         self.instance_core.get_current(param_name)
     }
     fn get_name(&self)->String {
@@ -715,10 +716,10 @@ impl TDataInstance for EnvDataDescInstance {
     fn reset(&mut self) {
         self.instance_core.reset()
     }
-    fn set_pending(&mut self,paramname:&str,pending_value:&BitVec) {
+    fn set_pending(&mut self,paramname:&str,pending_value:&BitVecU8) {
         self.instance_core.set_pending(paramname, pending_value)
     }
-    fn update_data_instance(&mut self,bit_array:&BitVec) {
+    fn update_data_instance(&mut self,bit_array:&BitVecU8) {
         self.instance_core.update_data_instance(bit_array)
     }
     fn get_children(&self)->Option<Vec<Arc<RefCell<dyn TDataInstance>>>> {
@@ -773,7 +774,7 @@ impl TDataInstance for StructureDataInstance
         return full_name;
         }
 
-    fn update_data_instance(&mut self,bit_array:&BitVec) {
+    fn update_data_instance(&mut self,bit_array:&BitVecU8) {
         //self.children_instances.clear();
         for instance in self.children_instances.iter()
         {
@@ -786,12 +787,12 @@ impl TDataInstance for StructureDataInstance
         }
     }
 
-    fn get_current(&mut self,param_name:&str)->BitVec
+    fn get_current(&mut self,param_name:&str)->BitVecU8
     {
         if param_name == ""
         { 
             let mut current_bit_pos = 0;
-            let mut bit_array = BitVec::<usize,Lsb0>::new();
+            let mut bit_array = BitVecU8::new();
             for instance in self.children_instances.iter()
             {
              let mut child_instance = instance.as_ref().borrow_mut();
@@ -862,7 +863,7 @@ impl TDataInstance for StructureDataInstance
         }
         self.instance_core.reset();
     }
-    fn set_pending(&mut self,param:&str,pending_value:&BitVec)
+    fn set_pending(&mut self,param:&str,pending_value:&BitVecU8)
     {
         if param == ""
         {
@@ -874,7 +875,7 @@ impl TDataInstance for StructureDataInstance
             let bit_position = child_instance.get_bit_position();
             let bit_length = child_instance.get_bit_length();
             let bit_vec_slice = &pending_value[bit_position+byte_position*8..bit_position+byte_position*8+bit_length];
-            let child_bitvec = BitVec::from_bitslice(bit_vec_slice);
+            let child_bitvec = BitVecU8::from_bitslice(bit_vec_slice);
             child_instance.set_pending("", &child_bitvec);
            }
         }
@@ -908,7 +909,7 @@ impl TDataInstance for StructureDataInstance
     {
        self.instance_core.set_parent(parent)
     }
-    fn get_pending(&self)->Option<BitVec> {
+    fn get_pending(&self)->Option<BitVecU8> {
         return self.instance_core.get_pending();
     }
 
@@ -945,7 +946,7 @@ pub struct ServiceMessageInstance {
 
 
 impl TDataInstance for ServiceMessageInstance {
-    fn get_pending(&self)->Option<BitVec> {
+    fn get_pending(&self)->Option<BitVecU8> {
         return self.instance_core.get_pending();
     }
     fn get_parent(&self)->&Option<Arc<RefCell<dyn TDataInstance >>>
@@ -972,7 +973,7 @@ impl TDataInstance for ServiceMessageInstance {
     fn get_bit_position(&self)->usize {
         self.instance_core.get_bit_position()
     }
-    fn get_current(&mut self,param_name:&str)->BitVec {
+    fn get_current(&mut self,param_name:&str)->BitVecU8 {
         self.instance_core.get_current(param_name)
     }
     fn get_name(&self)->String {
@@ -981,10 +982,10 @@ impl TDataInstance for ServiceMessageInstance {
     fn reset(&mut self) {
         self.instance_core.reset()
     }
-    fn set_pending(&mut self,paramname:&str,pending_value:&BitVec) {
+    fn set_pending(&mut self,paramname:&str,pending_value:&BitVecU8) {
         self.instance_core.set_pending(paramname, pending_value)
     }
-    fn update_data_instance(&mut self,bit_array:&BitVec) {
+    fn update_data_instance(&mut self,bit_array:&BitVecU8) {
         self.instance_core.update_data_instance(bit_array)
     }
     fn get_children(&self)->Option<Vec<Arc<RefCell<dyn TDataInstance>>>> {

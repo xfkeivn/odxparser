@@ -6,11 +6,11 @@ pub mod data_type;
 static mut COUNTER:u32 = 100;
 #[cfg(test)]
 mod tests {
-    use std::{rc::Rc, borrow::Borrow};
-    use bitvec::prelude::*;
-    use crate::{data_type::{Structure, ServiceMsgType}, data_instance::{DiagServiceInstance, ServiceMessageInstance, StructureDataInstance, DataInstanceCore, StructInstance}};
-
+    use std::{rc::Rc, borrow::Borrow, cell::RefCell};
+    use crate::{data_type::{Structure, ServiceMsgType}, data_instance::{DiagServiceInstance, ServiceMessageInstance, StructureDataInstance, DataInstanceCore, StructInstance,TDataInstance}};
+    use bitvec::{prelude::*, view::BitView};
     use super::*;
+    use std::sync::Arc;
 
     #[test]
     fn test_odx_parser()
@@ -36,27 +36,38 @@ mod tests {
 
     #[test]
     fn test_end_of_pdu() {
-        //let odxpath = r"D:\Workspace\RustApp\odxparser\odxparserlib\src\CN180S_V1.0.80.odx";
+        let odxpath = r"D:\Workspace\RustApp\odxparser\odxparserlib\src\CN180S_V1.0.80.odx";
         
-        let odxpath = r"E:\WORKSPACE\RustApps\odx_parser\odxparserlib\src\CN180S_V1.0.80.odx";
-        let parser = &mut parser::ODXParser::new();
-        //let result = parser.parse(odxpath);
-        //assert_eq!(result,true);
-
-        let variants = &parser.variants ;
-        let variant = variants.values().nth(0).unwrap().as_ref().borrow_mut();
-        let service_instances = &parser.variant_service_instances.get(variant.id.short_name.as_str()).unwrap();
-       
-        let service_instance = service_instances.iter().find(|s|s.positive_response_instance.as_ref().unwrap().id.as_str() == "_441" ).unwrap();
+        //let odxpath = r"E:\WORKSPACE\RustApps\odx_parser\odxparserlib\src\CN180S_V1.0.80.odx";
+        let mut parser = parser::ODXParser::new();
+        parser.parse(odxpath); 
         //let pos_service_instance = service_instance.positive_response_instance.as_ref().unwrap();
-        let pending_value = BitVec::<usize,Lsb0>::from_element(0x100 );
-        parser.set_pending("RQ_FaultMemory_Read_identified_errors.DtcStatusbyte_STRUCTURE",&pending_value );
+        let data  = [0xA5];
+        let pending_value = data.view_bits::<Lsb0>();
+        parser.set_pending("RQ_FaultMemory_Read_identified_errors.DtcStatusbyte_STRUCTURE",&BitVec::from_bitslice(pending_value) );
+        let service_instance = parser.get_diag_service_instance("CN180S_PEPS", "FaultMemory_Read_identified_errors");
         let request_instance = &service_instance.request_instance;
-        for child_instance in request_instance.as_struct().children_instances.iter()
+        for instance in request_instance.as_ref().borrow().as_struct().children_instances.iter()
         {
-            let instance = child_instance.as_ref().borrow();
+            print_child_instance(instance);
+            let pending_values =  instance.as_ref().borrow().get_pending();
+
+           
         }
     
+    }
+
+    fn print_child_instance(instance:&Arc<RefCell<dyn TDataInstance>>)
+    {
+        println!("{}",instance.as_ref().borrow().get_full_name());
+        if let Some(p) =  instance.as_ref().borrow().get_children()
+        {
+           for child in  p.iter()
+           {
+                print_child_instance(child);
+           }
+        }
+
     }
 
     

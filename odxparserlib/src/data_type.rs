@@ -179,7 +179,7 @@ pub struct Param
 {
     pub shortname:String,
     pub longname:Option<String>,
-    pub codedvalues:Vec<u32>,
+    pub codedvalues:Vec<usize>,
     pub dop_ref:Option<String>,
     pub byte_position:Option<u32>,
     pub bit_position:Option<u32>,
@@ -248,20 +248,20 @@ impl Param {
       
         else if let Some(p) =variantref.env_data_descs.get(self.dop_ref.as_ref().unwrap())
         {
-            EnvDataDesc::create_instance(p.clone(), name, bit_position, bit_position)
+            EnvDataDesc::create_instance(p.clone(), name, byte_position, bit_position)
       
         }
         else if let Some(p) =variantref.dynamic_fileds.get(self.dop_ref.as_ref().unwrap())
         {
-            DynamicLengthField::create_instance(p.clone(), name, bit_position, bit_position)
+            DynamicLengthField::create_instance(p.clone(), name, byte_position, bit_position)
         }
         else if let Some(p) =variantref.endofpdu_fileds.get(self.dop_ref.as_ref().unwrap())
         {
-            EndOfPDUField::create_instance(p.clone(), name, bit_position, bit_position)
+            EndOfPDUField::create_instance(p.clone(), name, byte_position, bit_position)
         }
         else if let Some(p) =variantref.muxs.get(self.dop_ref.as_ref().unwrap())
         {
-            Mux::create_instance(p.clone(), name, bit_position, bit_position)
+            Mux::create_instance(p.clone(), name, byte_position, bit_position)
         }
         else {
             panic!("")

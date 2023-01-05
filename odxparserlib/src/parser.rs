@@ -32,6 +32,25 @@ pub struct ODXParser
 }
 impl<'b> ODXParser
 {
+
+
+    pub fn get_variant(&self,name:&str)->Option<&Arc<RefCell<Variant>>>
+    {
+       
+     
+        let variants = &self.variants ;
+        let variant = variants.get(name);
+        return variant.clone();
+    }
+
+    pub fn get_diag_service_instance(&self,variantname:&str,servicename:&str)-> &DiagServiceInstance
+    {
+        let variant = self.get_variant(variantname).unwrap();
+        let service_instances = self.variant_service_instances.get(variant.as_ref().borrow().id.short_name.as_str()).unwrap();
+        let service_instance = service_instances.iter().find(|s|s.diag_service_name.as_str() == servicename ).unwrap();
+        return service_instance
+    }
+
     pub fn new()->ODXParser
     {
         return ODXParser{variants:HashMap::new(),odxfile:String::new(),current_variant_name:String::default(),..Default::default()}
@@ -69,45 +88,20 @@ impl<'b> ODXParser
 
     }
 
-    fn get_service_request_instance(&mut self,reqeust_name:&str)->& mut ServiceMessageInstance
+    fn get_service_request_instance(&mut self,reqeust_name:&str)->Arc<RefCell< ServiceMessageInstance>>
     {
         for (_key,variant) in self.variants.iter()
         {
             let var = &*variant.as_ref().borrow();
             let serviceinstances  = self.variant_service_instances.get_mut(var.id.short_name.as_str()).unwrap();
-            let service_instance = serviceinstances.iter_mut().find(|s|s.request_instance.short_name.as_str() == reqeust_name);
-            let mus= service_instance.map(|s|&mut s.request_instance).unwrap();
-            return mus
+            let service_instance = serviceinstances.iter_mut().find(|s|s.request_instance.as_ref().borrow().short_name.as_str() == reqeust_name);
+            let mus= service_instance.map(|s|&s.request_instance).unwrap();
+            return mus.clone();
             
         }
         panic!("there si no reqeust instance found for this servcie !")
     }
 
-    fn get_service_pos_response_instance(&self,service_name:&str)->Option<&ServiceMessageInstance>
-    {
-        for (_key,variant) in self.variants.iter()
-        {
-            let var = &*variant.as_ref().borrow();
-            let serviceinstances  = self.variant_service_instances.get(var.id.short_name.as_str()).unwrap();
-            let service_instance = serviceinstances.iter().find(|s|s.positive_response_instance.as_ref().unwrap().short_name.as_str() == service_name);
-            let pos_response = service_instance.map(|s|&s.positive_response_instance);
-            return pos_response.unwrap().as_ref();
-        }
-        panic!("there si no reqeust instance found for this servcie !")
-    }
-
-    fn get_service_negative_response_instance(&self,service_name:&str)->Option<&ServiceMessageInstance>
-    {
-        for (_key,variant) in self.variants.iter()
-        {
-            let var = &*variant.as_ref().borrow();
-            let serviceinstances  = self.variant_service_instances.get(var.id.short_name.as_str()).unwrap();
-            let service_instance = serviceinstances.iter().find(|s|s.negative_response_instance.as_ref().unwrap().short_name.as_str() == service_name);
-            let neg_response = service_instance.map(|s|&s.negative_response_instance);
-            return neg_response.unwrap().as_ref();
-        }
-        panic!("there si no reqeust instance found for this servcie !")
-    }
 
     pub fn set_pending(&mut self,param:&str,pending_value:&BitVec)
     {
@@ -118,12 +112,12 @@ impl<'b> ODXParser
                 let request_name = &param[0..index];
                 let remainding = &param[index+1..];
                 let request_instance = self.get_service_request_instance(request_name);
-                request_instance.as_mut_struct().set_pending(remainding, pending_value);
+                request_instance.as_ref().borrow_mut().as_mut_struct().set_pending(remainding, pending_value);
 
             },
             _=>{
                 let request_instance = self.get_service_request_instance(param);
-                request_instance.as_mut_struct().set_pending("", pending_value);
+                request_instance.as_ref().borrow_mut().as_mut_struct().set_pending("", pending_value);
             }
         }
     }
@@ -147,17 +141,22 @@ impl<'b> ODXParser
                 {   
                     if let ServiceMsgType::Request(p2) = &*p.as_ref().borrow_mut()
                     {
-                        let mut request_instance = ServiceMessageInstance{..Default::default()};
+                        let request_instance = Arc::new(RefCell::new(ServiceMessageInstance{..Default::default()}));
+                        let mut request_instance_ref = request_instance.as_ref().borrow_mut();
+                        request_instance_ref.short_name = p2.ident.short_name.clone();
+                        request_instance_ref.long_name = p2.ident.long_name.clone();
+                        request_instance_ref.id = p2.ident.id.clone();
                        
 
                     for param in p2.params.iter()
                     {   
                         let param_instance = param.create_data_instance(Some(variant.clone()));
-                        request_instance.as_mut_struct().children_instances.push(param_instance);
+                        param_instance.as_ref().borrow_mut().set_parent(request_instance.clone());
+                        request_instance_ref.as_mut_struct().children_instances.push(param_instance);
                         
                         
                     }
-                    serviceInstance.request_instance = request_instance;
+                    serviceInstance.request_instance = request_instance.clone();
 
                     }
                 }
@@ -167,17 +166,21 @@ impl<'b> ODXParser
                     {   
                         if let ServiceMsgType::PositiveResponse(p2) =  &*p.as_ref().borrow()
                         {
-                            let mut response_instance = ServiceMessageInstance{short_name:p2.ident.short_name.clone(),long_name:p2.ident.long_name.clone(),id:p2.ident.id.clone(),..Default::default()};
-                            
+                            let mut response_instance = Arc::new(RefCell::new(ServiceMessageInstance{short_name:p2.ident.short_name.clone(),long_name:p2.ident.long_name.clone(),id:p2.ident.id.clone(),..Default::default()}));
+                            let mut response_instance_ref = response_instance.as_ref().borrow_mut();
+                            response_instance_ref.short_name = p2.ident.short_name.clone();
+                            response_instance_ref.long_name = p2.ident.long_name.clone();
+                            response_instance_ref.id = p2.ident.id.clone();
                             
     
                         for param in p2.params.iter()
                         {
                             let param_instance = param.create_data_instance(Some(variant.clone()));
-                            response_instance.as_mut_struct().children_instances.push(param_instance);
+                            param_instance.as_ref().borrow_mut().set_parent(response_instance.clone());
+                            response_instance_ref.as_mut_struct().children_instances.push(param_instance);
                             
                         }
-                        serviceInstance.positive_response_instance = Some(response_instance);
+                        serviceInstance.positive_response_instance = Some(response_instance.clone());
     
                         }
                         
@@ -190,15 +193,19 @@ impl<'b> ODXParser
                     {   
                         if let ServiceMsgType::NegativeReponse(p2) = &*p.as_ref().borrow()
                         {
-                            let mut neg_response_instance = ServiceMessageInstance{short_name:p2.ident.short_name.clone(),long_name:p2.ident.long_name.clone(),id:p2.ident.id.clone(),..Default::default()};
-    
+                            let mut neg_response_instance = Arc::new(RefCell::new(ServiceMessageInstance{short_name:p2.ident.short_name.clone(),long_name:p2.ident.long_name.clone(),id:p2.ident.id.clone(),..Default::default()}));
+                            let mut response_instance_ref = neg_response_instance.as_ref().borrow_mut();
+                            response_instance_ref.short_name = p2.ident.short_name.clone();
+                            response_instance_ref.long_name = p2.ident.long_name.clone();
+                            response_instance_ref.id = p2.ident.id.clone();
                         for param in p2.params.iter()
                         {
                             let param_instance = param.create_data_instance(Some(variant.clone()));
-                            neg_response_instance.as_mut_struct().children_instances.push(param_instance);
+                            param_instance.as_ref().borrow_mut().set_parent(neg_response_instance.clone());
+                            response_instance_ref.as_mut_struct().children_instances.push(param_instance);
                             
                         }
-                        serviceInstance.negative_response_instance = Some(neg_response_instance);
+                        serviceInstance.negative_response_instance = Some(neg_response_instance.clone());
     
                         }
                         
@@ -512,12 +519,12 @@ impl<'b> ODXParser
         let phys_constant_value = self.__get_descendantText(node, "PHYS-CONSTANT-VALUE");
         let aatype = node.attribute("AA:type").map(|s|String::from(s));
         let sematic = node.attribute("SEMANTIC").map(|s|String::from(s));
-        let mut codevalues = Vec::<u32>::new();
+        let mut codevalues = Vec::<usize>::new();
         for n in  node.descendants()
         {
            if n.tag_name().name() == "CODED-VALUE"
            {
-            let codevalue = n.text().unwrap().parse::<u32>().unwrap();
+            let codevalue = n.text().unwrap().parse::<usize>().unwrap();
             codevalues.push(codevalue);
            }
 

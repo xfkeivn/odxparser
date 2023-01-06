@@ -298,7 +298,9 @@ pub struct DiagCodedType
 {
     pub aa_type:Option<String>,
     pub base_type:Option<String>,
+    pub termination:Option<String>,
     pub bit_length:Option<u32>,
+    pub min_length:Option<u32>,
     pub ishighbyteorder:Option<bool>
 }
 
@@ -307,10 +309,11 @@ impl DataType for DiagCodedType
     type InstanceType = CodedDataDataInstance ;
     fn create_instance(datatype:Arc<RefCell<DiagCodedType>>,name:&str,byte_position:u32,bit_position:u32,bit_length:Option<u32>)->Arc<RefCell<CodedDataDataInstance>>
     {
-        let di =  CodedDataDataInstance{
+        let mut di =  CodedDataDataInstance{
             instance_core:DataInstanceCore{datatype:datatype ,name:String::from(name),bit_position:bit_position,byte_position,..Default::default()},
             ..Default::default()
         };
+        di.reset();
         return Arc::new(RefCell::new(di));
 
     }
@@ -363,9 +366,10 @@ impl DataType for DataObjectProp
     type InstanceType = DataObjectPropDataInstance;
     fn create_instance(datatype:Arc<RefCell<DataObjectProp>>,name:&str,byte_position:u32,bit_position:u32,bit_length:Option<u32>)->Arc<RefCell<DataObjectPropDataInstance>>
     {
-        let di =  DataObjectPropDataInstance{
+        let mut di =  DataObjectPropDataInstance{
             instance_core:DataInstanceCore{datatype:datatype ,name:String::from(name),bit_position:bit_position,byte_position,..Default::default()},
         };
+        di.reset();
         return Arc::new(RefCell::new(di));
 
     }
@@ -394,7 +398,7 @@ impl DataType for Structure {
             instance_core:DataInstanceCore{datatype:datatype ,name:String::from(name),bit_position:bit_position,byte_position,..Default::default()},
             ..Default::default()
         }));
-        
+        di.borrow_mut().reset();
         for param in dt.as_ref().borrow().params.iter()
         {   
             let mut child = param.create_data_instance(dt.as_ref().borrow().ident.variant.clone());
@@ -423,9 +427,10 @@ impl DataType for EnvDataDesc
     type InstanceType = EnvDataDescInstance;
     fn create_instance(datatype:Arc<RefCell<EnvDataDesc>>,name:&str,byte_position:u32,bit_position:u32,bit_length:Option<u32>)->Arc<RefCell<EnvDataDescInstance>>
     {
-        let di =  EnvDataDescInstance{
+        let mut di =  EnvDataDescInstance{
             instance_core:DataInstanceCore{datatype:datatype ,name:String::from(name),bit_position:bit_position,byte_position,..Default::default()},
         };
+        di.reset();
         return Arc::new(RefCell::new(di));
 
     }
@@ -441,9 +446,10 @@ impl DataType for Reversed {
     type InstanceType = ReversedInstance;
     fn create_instance(datatype:Arc<RefCell<Reversed>>,name:&str,byte_position:u32,bit_position:u32,bit_length:Option<u32>)->Arc<RefCell<ReversedInstance>>
     {
-        let di =  ReversedInstance{
+        let mut di =  ReversedInstance{
             instance_core:DataInstanceCore{datatype:datatype ,name:String::from(name),bit_position:bit_position,byte_position:byte_position,bit_length:bit_length.unwrap(),..Default::default()},
         };
+        di.reset();
         return Arc::new(RefCell::new(di));
 
     }

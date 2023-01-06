@@ -106,11 +106,11 @@ impl <T> TDataInstance for DataInstanceCore<T> {
        self.nominal_value = Option::None;
 
     }
-    fn set_pending(&mut self,paramname:&str,pending_value:&BitVec<u8,Lsb0>)
+    fn set_pending(&mut self,paramname:&str,pending_value:&BitVecU8)
     {
         self.pending_value = Some(pending_value.clone());
     }
-    fn get_pending(&self)->Option<BitVec<u8,Lsb0>> {
+    fn get_pending(&self)->Option<BitVecU8> {
         return self.pending_value.clone();
     }
     fn get_children(&self)->Option<Vec<Arc<RefCell<dyn TDataInstance>>>> {
@@ -148,19 +148,28 @@ impl TDataInstance for CodedDataDataInstance
        self.instance_core.set_parent(parent)
     }
 
-    fn set_pending(&mut self,paramname:&str,pending_value:&BitVec<u8,Lsb0>)
+    fn set_pending(&mut self,paramname:&str,pending_value:&BitVecU8)
     {
        // don't do anything
     }
-    fn get_pending(&self)->Option<BitVec<u8,Lsb0>> {
+    fn get_pending(&self)->Option<BitVecU8> {
 
-        return self.coded_values.first().map(|value|BitVecU8::from_vec(value.clone().to_be_bytes().to_vec()));
+        let byte_len = self.get_bit_length()/8;
+        let coded_value = self.coded_values.first().unwrap();
+        let bytevec = coded_value.to_le_bytes().to_vec()[0..byte_len].to_vec();
+        return Some(BitVecU8::from_vec(bytevec));
     }
     fn get_name(&self)->String {
         return self.instance_core.get_name();
     }
     fn reset(&mut self) {
         self.instance_core.reset();
+        let v = self.get_bit_length()/8;
+        let zero_vec = vec![0u8; v];
+        self.set_pending("", &BitVecU8::from_vec(zero_vec.clone()));
+        self.instance_core.current_value = Some(BitVecU8::from_vec(zero_vec.clone()));
+           
+        
     }
     fn get_bit_position(&self)->usize {
         self.instance_core.get_bit_length()
@@ -168,10 +177,10 @@ impl TDataInstance for CodedDataDataInstance
     fn get_byte_position(&self)->usize {
         self.instance_core.get_byte_position()
     }
-    fn get_current(&mut self,param_name:&str)->BitVec<u8,Lsb0> {
+    fn get_current(&mut self,param_name:&str)->BitVecU8 {
         self.instance_core.get_current(param_name)
     }
-    fn update_data_instance(&mut self,bit_array:&BitVec<u8,Lsb0>) {
+    fn update_data_instance(&mut self,bit_array:&BitVecU8) {
         // the coded value cannot be updated 
         //self.instance_core.update_data_instance(bit_array)
     }
@@ -180,24 +189,6 @@ impl TDataInstance for CodedDataDataInstance
     }
 }
 
-
-
-
-impl CodedDataDataInstance {
-    fn get_coded_value(&self)
-    {
-        self.coded_values.first().unwrap();
-    }
-    fn set_pending()
-    {
-        panic!("coded instance cannot be called set pending")
-    }
-    fn get_name(&self)->String
-    {
-        return self.instance_core.name.clone();
-    }
-
-}
 
 #[derive(Default)]
 pub struct DataObjectPropDataInstance
@@ -228,7 +219,7 @@ impl TDataInstance for DataObjectPropDataInstance{
     fn get_full_name(&self)->String {
         return self.instance_core.get_full_name();
     }
-    fn get_pending(&self)->Option<BitVec<u8,Lsb0>> {
+    fn get_pending(&self)->Option<BitVecU8> {
         return self.instance_core.get_pending();
     }
     fn get_bit_position(&self)->usize {
@@ -237,19 +228,23 @@ impl TDataInstance for DataObjectPropDataInstance{
     fn get_byte_position(&self)->usize {
         self.instance_core.get_byte_position()
     }
-    fn get_current(&mut self,param_name:&str)->BitVec<u8,Lsb0> {
+    fn get_current(&mut self,param_name:&str)->BitVecU8 {
         self.instance_core.get_current(param_name)
     }
     fn get_name(&self)->String {
         self.instance_core.get_name()
     }
     fn reset(&mut self) {
-        self.instance_core.reset()
+        self.instance_core.reset();
+        let v = self.get_bit_length()/8;
+        let zero_vec = vec![0u8; v];
+        self.set_pending("", &BitVecU8::from_vec(zero_vec.clone()));
+        self.instance_core.current_value = Some(BitVecU8::from_vec(zero_vec.clone()));
     }
-    fn set_pending(&mut self,paramname:&str,pending_value:&BitVec<u8,Lsb0>) {
+    fn set_pending(&mut self,paramname:&str,pending_value:&BitVecU8) {
         self.instance_core.set_pending(paramname, pending_value)
     }
-    fn update_data_instance(&mut self,bit_array:&BitVec<u8,Lsb0>) {
+    fn update_data_instance(&mut self,bit_array:&BitVecU8) {
         
     }
     fn get_children(&self)->Option<Vec<Arc<RefCell<dyn TDataInstance>>>> {
@@ -296,7 +291,7 @@ impl TDataInstance for StaticFieldInstance{
     fn get_full_name(&self)->String {
         return self.instance_core.get_full_name();
     }
-    fn get_pending(&self)->Option<BitVec<u8,Lsb0>> {
+    fn get_pending(&self)->Option<BitVecU8> {
         return self.instance_core.get_pending();
     }
     fn get_bit_position(&self)->usize {
@@ -305,21 +300,34 @@ impl TDataInstance for StaticFieldInstance{
     fn get_byte_position(&self)->usize {
         self.instance_core.get_byte_position()
     }
-    fn get_current(&mut self,param_name:&str)->BitVec<u8,Lsb0> {
+    fn get_current(&mut self,param_name:&str)->BitVecU8 {
         self.instance_core.get_current(param_name)
     }
     fn reset(&mut self) {
-        self.instance_core.reset()
+        self.instance_core.reset();
+        let v = self.get_bit_length()/8;
+        let zero_vec = vec![0u8; v];
+        self.set_pending("", &BitVecU8::from_vec(zero_vec.clone()));
+        self.instance_core.current_value = Some(BitVecU8::from_vec(zero_vec.clone()));
     }
     fn get_name(&self)->String {
         self.instance_core.get_name()
     }
-    fn update_data_instance(&mut self,bit_array:&BitVec<u8,Lsb0>) {
-        self.instance_core.update_data_instance(bit_array)
-
+    fn update_data_instance(&mut self,bit_array:&BitVecU8) {
+        self.instance_core.update_data_instance(bit_array);
+        for instance in self.children_instances.iter()
+        {
+         let mut child_instance = instance.as_ref().borrow_mut();
+         let bit_position = child_instance.get_bit_position();
+         let bit_length = child_instance.get_bit_length();
+         let bit_vec_slice = &bit_array[bit_position..=bit_position+bit_length];
+         let child_bitvec = BitVec::from_bitslice(bit_vec_slice);
+         child_instance.update_data_instance(&child_bitvec);
+        }
     }
-    fn set_pending(&mut self,paramname:&str,pending_value:&BitVec<u8,Lsb0>) {
+    fn set_pending(&mut self,paramname:&str,pending_value:&BitVecU8) {
         self.instance_core.set_pending(paramname, pending_value)
+
     }
     fn get_children(&self)->Option<Vec<Arc<RefCell<dyn TDataInstance>>>> {
         return Some(self.children_instances.clone())
@@ -351,7 +359,7 @@ impl TDataInstance for ReversedInstance{
     fn get_full_name(&self)->String {
         return self.instance_core.get_full_name();
     }
-    fn get_pending(&self)->Option<BitVec<u8,Lsb0>> {
+    fn get_pending(&self)->Option<BitVecU8> {
         return self.instance_core.get_pending();
     }
     fn get_bit_length(&self)->usize {
@@ -363,19 +371,23 @@ impl TDataInstance for ReversedInstance{
     fn get_bit_position(&self)->usize {
         self.instance_core.get_bit_position()
     }
-    fn get_current(&mut self,param_name:&str)->BitVec<u8,Lsb0> {
+    fn get_current(&mut self,param_name:&str)->BitVecU8 {
         self.instance_core.get_current(param_name)
     }
     fn get_name(&self)->String {
         self.instance_core.get_name()
     }
     fn reset(&mut self) {
-        self.instance_core.reset()
+        self.instance_core.reset();
+        let v = self.get_bit_length()/8;
+        let zero_vec = vec![0u8; v];
+        self.set_pending("", &BitVecU8::from_vec(zero_vec.clone()));
+        self.instance_core.current_value = Some(BitVecU8::from_vec(zero_vec.clone()));
     }
-    fn set_pending(&mut self,paramname:&str,pending_value:&BitVec<u8,Lsb0>) {
+    fn set_pending(&mut self,paramname:&str,pending_value:&BitVecU8) {
         self.instance_core.set_pending(paramname, pending_value)
     }
-    fn update_data_instance(&mut self,bit_array:&BitVec<u8,Lsb0>) {
+    fn update_data_instance(&mut self,bit_array:&BitVecU8) {
         self.instance_core.update_data_instance(bit_array)
     }
     fn get_children(&self)->Option<Vec<Arc<RefCell<dyn TDataInstance>>>> {
@@ -409,7 +421,7 @@ impl TDataInstance for  ListLengthInstance {
     fn get_full_name(&self)->String {
         return self.instance_core.get_full_name();
     }
-    fn get_pending(&self)->Option<BitVec<u8,Lsb0>> {
+    fn get_pending(&self)->Option<BitVecU8> {
         return self.instance_core.get_pending();
     }
     fn get_bit_length(&self)->usize {
@@ -421,7 +433,7 @@ impl TDataInstance for  ListLengthInstance {
     fn get_bit_position(&self)->usize {
         self.instance_core.get_bit_position()
     }
-    fn get_current(&mut self,param_name:&str)->BitVec<u8,Lsb0> {
+    fn get_current(&mut self,param_name:&str)->BitVecU8 {
         self.instance_core.get_current(param_name)
     }
     fn get_name(&self)->String {
@@ -430,10 +442,10 @@ impl TDataInstance for  ListLengthInstance {
     fn reset(&mut self) {
         self.instance_core.reset()
     }
-    fn set_pending(&mut self,paramname:&str,pending_value:&BitVec<u8,Lsb0>) {
+    fn set_pending(&mut self,paramname:&str,pending_value:&BitVecU8) {
         self.instance_core.set_pending(paramname, pending_value)
     }
-    fn update_data_instance(&mut self,bit_array:&BitVec<u8,Lsb0>) {
+    fn update_data_instance(&mut self,bit_array:&BitVecU8) {
         self.instance_core.update_data_instance(bit_array)
     }
     fn get_children(&self)->Option<Vec<Arc<RefCell<dyn TDataInstance>>>> {
@@ -776,12 +788,14 @@ impl TDataInstance for StructureDataInstance
 
     fn update_data_instance(&mut self,bit_array:&BitVecU8) {
         //self.children_instances.clear();
+        self.instance_core.current_value = Some(bit_array.clone());
         for instance in self.children_instances.iter()
         {
          let mut child_instance = instance.as_ref().borrow_mut();
+         let byte_position = child_instance.get_byte_position();
          let bit_position = child_instance.get_bit_position();
          let bit_length = child_instance.get_bit_length();
-         let bit_vec_slice = &bit_array[bit_position..=bit_position+bit_length];
+         let bit_vec_slice = &bit_array[bit_position+byte_position*8..bit_position+bit_length+byte_position*8];
          let child_bitvec = BitVec::from_bitslice(bit_vec_slice);
          child_instance.update_data_instance(&child_bitvec);
         }
@@ -862,19 +876,45 @@ impl TDataInstance for StructureDataInstance
             instance.as_ref().borrow_mut().reset();
         }
         self.instance_core.reset();
+        let v = self.instance_core.datatype.borrow().bytesize;
+        match v
+        {
+            Some(p)=>{
+                let zero_vec = vec![0u8; p as usize];
+                self.instance_core.set_pending("", &BitVecU8::from_vec(zero_vec.clone()));
+                self.set_pending("", &BitVecU8::from_vec(zero_vec.clone()));
+                self.instance_core.current_value = Some(BitVecU8::from_vec(zero_vec.clone()));
+            },
+            _=>{
+                panic!("The struct {} has no byte-size",self.get_name());
+
+            }
+        }
     }
     fn set_pending(&mut self,param:&str,pending_value:&BitVecU8)
     {
+        
         if param == ""
         {
-            //let bit_vec:BitVec<u8,Lsb0>= pending_value;
+            //update the all instance pending value
+
+            if pending_value.len() != self.get_bit_length()
+            {
+                panic!("The set pending data length is not the size of my size");
+            }
+
+            self.instance_core.set_pending("", pending_value);
+            //let bit_vec:BitVecU8= pending_value;
            for instance in self.children_instances.iter()
            {
             let mut child_instance = instance.as_ref().borrow_mut();
             let byte_position = child_instance.get_byte_position();
             let bit_position = child_instance.get_bit_position();
             let bit_length = child_instance.get_bit_length();
-            let bit_vec_slice = &pending_value[bit_position+byte_position*8..bit_position+byte_position*8+bit_length];
+            let bit_start = bit_position+byte_position*8;
+            let bit_end = bit_position+byte_position*8+bit_length;
+            let bit_vec_slice = &pending_value.as_bitslice()[bit_start..bit_end];
+            //println!("{}",bit_vec_slice);
             let child_bitvec = BitVecU8::from_bitslice(bit_vec_slice);
             child_instance.set_pending("", &child_bitvec);
            }
@@ -889,13 +929,14 @@ impl TDataInstance for StructureDataInstance
                 paths.remove(0);
                 let remainder_string = paths.join(".");
                 child_instance.as_ref().borrow_mut().set_pending(remainder_string.as_str(), pending_value);
-                break;
+                // updated the parents pending data as well
+               // let byte_position = child_instance.as_ref().borrow().get_byte_position();
+             //   let bit_position = child_instance.as_ref().borrow().get_bit_position();
+              //  let bit_length = child_instance.as_ref().borrow().get_bit_length();
+              //  let bit_start = bit_position+byte_position*8;
+               
             }
-           
-           }
-           
-
-        
+           }       
         }
 
     }
@@ -910,11 +951,52 @@ impl TDataInstance for StructureDataInstance
        self.instance_core.set_parent(parent)
     }
     fn get_pending(&self)->Option<BitVecU8> {
-        return self.instance_core.get_pending();
+       //
+        let mut bitvect = BitVecU8::new();
+       for instance in self.children_instances.iter()
+       {
+        let mut child_instance = instance.as_ref().borrow_mut();
+        let byte_position = child_instance.get_byte_position();
+        let bit_position = child_instance.get_bit_position();
+        let bit_length = child_instance.get_bit_length();
+        let bit_start = bit_position+byte_position*8;
+        let bit_end = bit_position+byte_position*8+bit_length;
+        let child_pending_data = child_instance.get_pending();
+        let size = bitvect.as_bitslice().len();
+        if (bit_start == bitvect.as_bitslice().len())
+        {
+            bitvect.extend_from_bitslice(child_pending_data.unwrap().as_bitslice());
+        }
+        else {
+            let padding_count = bit_start - bitvect.as_bitslice().len();
+            for _ in (0..padding_count)
+            {
+                bitvect.push(false);
+
+            }
+            
+        }
+
+       }
+
+       return Some(bitvect);
+
+       // return self.instance_core.get_pending();
     }
 
     fn get_bit_length(&self)->usize {
-        return self.instance_core.get_bit_length()
+
+        let bytesize = self.instance_core.datatype.borrow().bytesize;
+        match bytesize
+        {
+            Some(size)=>{return 8*size as usize;}
+            
+            _=>{
+            return self.instance_core.get_bit_length()
+            }
+        }
+
+       
     }
     fn get_byte_position(&self)->usize {
         self.instance_core.get_byte_position()
@@ -947,7 +1029,7 @@ pub struct ServiceMessageInstance {
 
 impl TDataInstance for ServiceMessageInstance {
     fn get_pending(&self)->Option<BitVecU8> {
-        return self.instance_core.get_pending();
+        return self.struct_data_instance.get_pending();
     }
     fn get_parent(&self)->&Option<Arc<RefCell<dyn TDataInstance >>>
     {

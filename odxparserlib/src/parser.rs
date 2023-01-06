@@ -28,7 +28,8 @@ pub struct ODXParser
     pub variants:HashMap<String, Arc<RefCell<Variant>>>,
     pub current_variant_name:String,
     odxfile:String,
-    pub variant_service_instances:HashMap<String,Vec<DiagServiceInstance>>
+    pub variant_service_instances:HashMap<String,Vec<DiagServiceInstance>>,
+    namespace:Option<String>
 }
 impl<'b> ODXParser
 {
@@ -66,6 +67,7 @@ impl<'b> ODXParser
         Ok(_) => {
             
             doc = roxmltree::Document::parse(&s).unwrap();
+            self.namespace =doc.root_element().default_namespace().map(|n|String::from(n));
             self.__parseDocument(&doc);
             self.__create_instances();
 
@@ -85,7 +87,6 @@ impl<'b> ODXParser
             return service_instance;
         }
         panic!("there si no reqeust instance found for this servcie !")
-
     }
 
     fn get_service_request_instance(&mut self,reqeust_name:&str)->Arc<RefCell< ServiceMessageInstance>>
@@ -122,6 +123,21 @@ impl<'b> ODXParser
         }
     }
 
+    pub fn update_positive_response(&mut self,servicename:&str,response_data:Vec<u8>)
+    {
+        let bitvec = BitVecU8::from_vec(response_data);
+        let diagservice = self.get_service_instance_by_name(servicename);
+        let pos_instance = diagservice.unwrap().positive_response_instance.as_ref().unwrap();
+        let mut pos_instance = pos_instance.as_ref().borrow_mut();
+        pos_instance.as_mut_struct().update_data_instance(&bitvec);
+    }
+
+    pub fn update_negative_response(&mut self,servicename:&str,response_data:Vec<u8>)
+    {
+        let bitvec = BitVecU8::from_vec(response_data);
+
+    }
+
     fn __create_instances(&mut self)
     {
         for (key,variant) in self.variants.iter()
@@ -146,6 +162,7 @@ impl<'b> ODXParser
                         request_instance_ref.short_name = p2.ident.short_name.clone();
                         request_instance_ref.long_name = p2.ident.long_name.clone();
                         request_instance_ref.id = p2.ident.id.clone();
+                        request_instance_ref.reset();
                        
 
                     for param in p2.params.iter()
@@ -171,6 +188,7 @@ impl<'b> ODXParser
                             response_instance_ref.short_name = p2.ident.short_name.clone();
                             response_instance_ref.long_name = p2.ident.long_name.clone();
                             response_instance_ref.id = p2.ident.id.clone();
+                            response_instance_ref.reset();
                             
     
                         for param in p2.params.iter()
@@ -296,12 +314,16 @@ impl<'b> ODXParser
         {
             Some(diagcodetype)=>Some({
                 let aatype = diagcodetype.attribute("AA:type");
+                //let aatype = diagcodetype.attribute("xsi:type");
                 let basedatatype = diagcodetype.attribute("BASE-DATA-TYPE");
+                let termination = diagcodetype.attribute("TERMINATION");
                 let ishighlow = diagcodetype.attribute("IS-HIGHLOW-BYTE-ORDER").map(|ishighlow|ishighlow=="false");
                 let bitlength = self.__get_descendantText(&diagcodetype,"BIT-LENGTH").map(|bitlength|bitlength.parse::<u32>().unwrap());
-                
+                let min_length = self.__get_descendantText(&diagcodetype,"MIN-LENGTH").map(|bitlength|bitlength.parse::<u32>().unwrap());
                 Arc::new(RefCell::new(DiagCodedType {
                    aa_type:aatype.map(|n|String::from(n)),
+                   min_length:min_length,
+                   termination:termination.map(|n|String::from(n)),
                    base_type:basedatatype.map(|n|String::from(n)),
                    ishighbyteorder:ishighlow,
                    bit_length:bitlength  
@@ -713,9 +735,9 @@ impl<'b> ODXParser
         let ident = self.__get_ident(node);
         let semantic = node.attribute("SEMANTIC").map(|s|String::from(s));
         let request_ref = node.children().find(|n|n.tag_name().name() == "REQUEST-REF").map(|node|String::from(node.attribute("ID-REF").unwrap())).unwrap();
-        let positive_resp_ref = node.children().find(|n|n.tag_name().name() == "POS-RESPONSE-REF").map(|node|String::from(node.attribute("ID-REF").unwrap()));
-        let negative_resp_ref = node.children().find(|n|n.tag_name().name() == "NEG-RESPONSE-REF").map(|node|String::from(node.attribute("ID-REF").unwrap()));
-        let func_class_ref = node.children().find(|n|n.tag_name().name() == "FUNCT-CLASS-REF").map(|node|String::from(node.attribute("ID-REF").unwrap()));
+        let positive_resp_ref = node.descendants().find(|n|n.tag_name().name() == "POS-RESPONSE-REF").map(|node|String::from(node.attribute("ID-REF").unwrap()));
+        let negative_resp_ref = node.descendants().find(|n|n.tag_name().name() == "NEG-RESPONSE-REF").map(|node|String::from(node.attribute("ID-REF").unwrap()));
+        let func_class_ref = node.descendants().find(|n|n.tag_name().name() == "FUNCT-CLASS-REF").map(|node|String::from(node.attribute("ID-REF").unwrap()));
        
         DiagSerivce{
             ident:ident,
@@ -853,13 +875,13 @@ impl<'b> ODXParser
                     {
                         let mut dataprop = self.__get_serive_msg(&desdentnode);
                         
-                        arc_variant.as_ref().borrow_mut().pos_responses.insert(dataprop.ident.id.clone(), Arc::new(RefCell::new(ServiceMsgType::Request(dataprop))));
+                        arc_variant.as_ref().borrow_mut().pos_responses.insert(dataprop.ident.id.clone(), Arc::new(RefCell::new(ServiceMsgType::PositiveResponse(dataprop))));
                     }
                     else if  desdentnode.tag_name().name() == "NEG-RESPONSE"
                     {
                         let mut dataprop = self.__get_serive_msg(&desdentnode);
                         
-                        arc_variant.as_ref().borrow_mut().neg_responses.insert(dataprop.ident.id.clone(), Arc::new(RefCell::new(ServiceMsgType::Request(dataprop))));
+                        arc_variant.as_ref().borrow_mut().neg_responses.insert(dataprop.ident.id.clone(), Arc::new(RefCell::new(ServiceMsgType::NegativeReponse(dataprop))));
                     }
                     else if  desdentnode.tag_name().name() == "COMPARAM-REF"
                     {

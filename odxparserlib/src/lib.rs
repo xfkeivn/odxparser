@@ -12,6 +12,7 @@ mod tests {
     use super::*;
     use data_instance::*;
     use std::sync::Arc;
+    
 
     #[test]
     fn test_odx_parser()
@@ -36,36 +37,49 @@ mod tests {
 
 
     #[test]
-    fn test_end_of_pdu() {
-       // let odxpath = r"D:\Workspace\RustApp\odxparser\odxparserlib\src\CN180S_V1.0.80.odx";
+    fn test_structure_fixed_sized() {
+        let odxpath = r"D:\Workspace\RustApp\odxparser\odxparserlib\src\CN180S_V1.0.80.odx";
         
-        let odxpath = r"E:\WORKSPACE\RustApps\odx_parser\odxparserlib\src\CN180S_V1.0.80.odx";
+       // let odxpath = r"E:\WORKSPACE\RustApps\odx_parser\odxparserlib\src\CN180S_V1.0.80.odx";
         let mut parser = parser::ODXParser::new();
         parser.parse(odxpath); 
         //let pos_service_instance = service_instance.positive_response_instance.as_ref().unwrap();
-        let data  = [1,1,1,1];
+        let data  = 0x55u8;
         let pending_value = data.view_bits::<Lsb0>();
-        let r = &pending_value[0..9];
-        
-        let bv = BitVecU8::from_bitslice(r);
-        let s = bv.as_raw_slice();
-        
+        println!("{}",pending_value);
+        let bv = BitVecU8::from(pending_value);
+        println!("{:?}",bv.as_raw_slice());
         parser.set_pending("RQ_FaultMemory_Read_identified_errors.DtcStatusbyte_STRUCTURE",&BitVecU8::from_bitslice(pending_value) );
+        
+        let mut bit1 = BitVecU8::new();
+        bit1.push(true);
+        //parser.set_pending("RQ_FaultMemory_Read_identified_errors.DtcStatusbyte_STRUCTURE.TestFailedSinceLastClear",&bit1);
         let service_instance = parser.get_diag_service_instance("CN180S_PEPS", "FaultMemory_Read_identified_errors");
         let request_instance = &service_instance.request_instance;
+        
+        // test the expected value 
+        let expected = BitVecU8::from_vec(vec![25u8,0x2,0x55u8]);
+        assert_eq!(request_instance.as_ref().borrow().get_pending().unwrap(),expected);
+
         for instance in request_instance.as_ref().borrow().as_struct().children_instances.iter()
         {
             print_child_instance(instance);
-            let pending_values =  instance.as_ref().borrow().get_pending();
-
-           
         }
+
+        let pos_instance = &service_instance.positive_response_instance;
+        let response_data = [89u8,2,0xff,0xff,0xff,0xff,0xff];
+        parser.update_positive_response("FaultMemory_Read_identified_errors", response_data.to_vec());
+        //
+        
+
     
     }
 
     fn print_child_instance(instance:&Arc<RefCell<dyn TDataInstance>>)
     {
-        println!("{}",instance.as_ref().borrow().get_full_name());
+        
+        let pending_data = &instance.as_ref().borrow().get_pending();
+        println!("{},Bit_Length={},value={:#?}",instance.as_ref().borrow().get_full_name(),pending_data.as_ref().unwrap().len(),pending_data);
         if let Some(p) =  instance.as_ref().borrow().get_children()
         {
            for child in  p.iter()
